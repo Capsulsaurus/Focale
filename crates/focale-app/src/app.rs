@@ -24,6 +24,7 @@ use crate::viewport::{self, ViewportCallback, ViewportRenderer};
 /// Worker → UI messages.
 enum Msg {
     Base(PathBuf, Result<PreviewBase, String>),
+    AiMask(PathBuf, Result<focale_core::masks::ResolvedMask, String>),
     Frame(Box<PreviewFrame>),
     Thumb(PathBuf, ColorImage),
     Export(usize, ExportStatus),
@@ -36,6 +37,8 @@ enum Msg {
 enum Tool {
     Pan,
     Crop,
+    /// Click to segment the object under the cursor (MobileSAM).
+    AiObject,
     LinearMask,
     RadialMask,
     BrushMask,
@@ -93,6 +96,10 @@ pub struct FocaleApp {
     clipboard: Option<EditState>,
     suggestions: SuggestionSet,
     suggest_pending: Option<JobHandle>,
+    /// Local ONNX segmentation (PRD §4); models load lazily from the user
+    /// data dir. `None` until first use.
+    segmenter: std::sync::Arc<std::sync::Mutex<focale_segment::Segmenter>>,
+    segmenting: bool,
 }
 
 impl FocaleApp {
@@ -141,6 +148,10 @@ impl FocaleApp {
             clipboard: None,
             suggestions: SuggestionSet::default(),
             suggest_pending: None,
+            segmenter: std::sync::Arc::new(std::sync::Mutex::new(focale_segment::Segmenter::new(
+                focale_segment::ModelPaths::user_default(),
+            ))),
+            segmenting: false,
         }
     }
 
@@ -394,6 +405,17 @@ impl FocaleApp {
                         item.status = status;
                     }
                 }
+                Msg::AiMask(path, result) => {
+                    self.segmenting = false;
+                    if Some(&path) == self.primary_path().as_ref() {
+                        match result {
+                            Ok(mask) => {
+                                self.push_mask(focale_core::masks::MaskShape::AiResolved(mask));
+                            }
+                            Err(e) => tracing::error!("segmentation failed: {e}"),
+                        }
+                    }
+                }
                 Msg::Suggest(path, set) => {
                     if Some(path) == self.primary_path() {
                         self.suggestions = set;
@@ -470,6 +492,7 @@ impl eframe::App for FocaleApp {
                     (Tool::BrushMask, "Brush"),
                     (Tool::Heal, "Heal"),
                     (Tool::Clone, "Clone"),
+                    (Tool::AiObject, "AI object"),
                 ] {
                     if ui.selectable_label(self.tool == tool, label).clicked() && self.tool != tool
                     {
@@ -481,6 +504,12 @@ impl eframe::App for FocaleApp {
                     ui.add(
                         egui::Slider::new(&mut self.brush_radius, 0.005..=0.15).text("Brush size"),
                     );
+                }
+                ui.menu_button("AI mask", |ui| {
+                    self.ai_mask_menu(ui);
+                });
+                if self.segmenting {
+                    ui.spinner();
                 }
                 ui.separator();
                 let zoom_label = match self.zoom {
@@ -862,6 +891,14 @@ impl FocaleApp {
             Tool::LinearMask | Tool::RadialMask => self.gradient_drag(response, img_pos),
             Tool::BrushMask => self.brush_drag(response, img_pos),
             Tool::Heal | Tool::Clone => self.retouch_drag(response, img_pos),
+            Tool::AiObject => {
+                if response.clicked()
+                    && let Some(p) = img_pos
+                {
+                    let point = self.to_sensor_frame(p);
+                    self.spawn_segmentation(SegmentRequest::Object(point));
+                }
+            }
         }
     }
 
@@ -957,6 +994,7 @@ impl FocaleApp {
     }
 
     fn retouch_drag(&mut self, response: &egui::Response, img_pos: Option<[f32; 2]>) {
+        let img_pos = img_pos.map(|p| self.to_sensor_frame(p));
         if response.drag_started() {
             self.drag_start = img_pos;
         }
@@ -994,6 +1032,118 @@ impl FocaleApp {
                 self.after_edit_change();
             }
         }
+    }
+
+    /// Maps displayed-frame normalized coordinates to the sensor (pre-
+    /// orientation) frame that masks and retouch strokes are stored in.
+    /// Crop is exempt: the geometry stage applies it after orientation.
+    fn to_sensor_frame(&self, p: [f32; 2]) -> [f32; 2] {
+        let orientation = self
+            .primary_path()
+            .and_then(|path| {
+                self.bases
+                    .get(&path)
+                    .map(|b| b.decoded.metadata.orientation)
+            })
+            .unwrap_or(1);
+        let [x, y] = p;
+        match orientation {
+            2 => [1.0 - x, y],
+            3 => [1.0 - x, 1.0 - y],
+            4 => [x, 1.0 - y],
+            5 => [y, x],
+            6 => [y, 1.0 - x],
+            7 => [1.0 - y, 1.0 - x],
+            8 => [1.0 - y, x],
+            _ => [x, y],
+        }
+    }
+
+    fn ai_mask_menu(&mut self, ui: &mut egui::Ui) {
+        use focale_core::masks::PersonPart;
+        let available: bool = {
+            let seg = self.segmenter.lock().unwrap();
+            seg.available().iter().any(|(_, ok)| *ok)
+        };
+        if !available {
+            ui.label("No models installed.");
+            ui.label("Run scripts/fetch-models.sh to download them.");
+            return;
+        }
+        if ui.button("Subject").clicked() {
+            self.spawn_segmentation(SegmentRequest::Subject);
+            ui.close();
+        }
+        if ui.button("Sky").clicked() {
+            self.spawn_segmentation(SegmentRequest::Sky);
+            ui.close();
+        }
+        if ui.button("Background").clicked() {
+            self.spawn_segmentation(SegmentRequest::Background);
+            ui.close();
+        }
+        if ui.button("Person").clicked() {
+            self.spawn_segmentation(SegmentRequest::Person);
+            ui.close();
+        }
+        ui.menu_button("Person part", |ui| {
+            for (part, label) in [
+                (PersonPart::FaceSkin, "Face skin"),
+                (PersonPart::BodySkin, "Body skin"),
+                (PersonPart::Hair, "Hair"),
+                (PersonPart::Eyebrows, "Eyebrows"),
+                (PersonPart::Sclera, "Eyes (sclera)"),
+                (PersonPart::Iris, "Eyes (iris)"),
+                (PersonPart::Lips, "Lips"),
+                (PersonPart::Teeth, "Teeth"),
+                (PersonPart::Clothing, "Clothing"),
+            ] {
+                if ui.button(label).clicked() {
+                    self.spawn_segmentation(SegmentRequest::Part(part));
+                    ui.close();
+                }
+            }
+        });
+    }
+
+    /// Runs segmentation on the white-balanced working image of the preview
+    /// base (sensor frame, so resolved bitmaps align with mask storage).
+    fn spawn_segmentation(&mut self, request: SegmentRequest) {
+        let Some(path) = self.primary_path() else {
+            return;
+        };
+        let Some(base) = self.bases.get(&path).cloned() else {
+            return;
+        };
+        let wb = self.doc_mut(&path).edit.white_balance.clone();
+        let segmenter = self.segmenter.clone();
+        let tx = self.tx.clone();
+        self.segmenting = true;
+        self.scheduler.submit(Priority::Preview, move || {
+            let mut image = focale_core::image::ImageRgbF32::from_data(
+                base.decoded.width,
+                base.decoded.height,
+                base.decoded.pixels.clone(),
+            );
+            focale_core::pipeline::v1::white_balance::apply(
+                &mut image,
+                &wb,
+                &base.decoded.metadata,
+            );
+            let result = {
+                let mut seg = segmenter.lock().unwrap();
+                match request {
+                    SegmentRequest::Subject => seg.subject(&image),
+                    SegmentRequest::Sky => seg.sky(&image),
+                    SegmentRequest::Background => seg.background(&image),
+                    SegmentRequest::Person => seg.person(&image),
+                    SegmentRequest::Part(part) => seg.person_part(&image, part),
+                    SegmentRequest::Object(point) => seg.object_at(&image, point),
+                }
+            }
+            .map_err(|e| e.to_string());
+            let _ = tx.send(Msg::AiMask(base.path.clone(), result));
+        });
     }
 
     fn push_mask(&mut self, shape: focale_core::masks::MaskShape) {
@@ -1081,4 +1231,15 @@ impl FocaleApp {
             }
         }
     }
+}
+
+/// A queued segmentation request.
+#[derive(Debug, Clone, Copy)]
+enum SegmentRequest {
+    Subject,
+    Sky,
+    Background,
+    Person,
+    Part(focale_core::masks::PersonPart),
+    Object([f32; 2]),
 }

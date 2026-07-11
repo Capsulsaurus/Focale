@@ -12,6 +12,7 @@ rust-version = "1.90"
 [workspace.dependencies]
 focale-core = { path = "crates/focale-core" }
 focale-export = { path = "crates/focale-export" }
+focale-segment = { path = "crates/focale-segment" }
 focale-sidecar = { path = "crates/focale-sidecar" }
 
 avif-serialize = "0.8"
