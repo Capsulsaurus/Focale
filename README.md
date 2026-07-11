@@ -40,3 +40,44 @@ current editor's output.
 - Assume hardware is capable and scale upwards.
 - Use Rust where possible for its memory guarantees and modern toolchain. Drop to C/C++ for native APIs if strictly necessary. Compile with LLVM for all targets.
 - Subsystems clearly define ownership of logic.
+
+## Prerequisites
+
+- [Rust (rustup)](https://rustup.rs) — toolchain (pinned via `rust-toolchain.toml`)
+- [just](https://github.com/casey/just) — command runner
+- [Lefthook](https://github.com/evilmartians/lefthook) — git hooks manager (`lefthook install` after cloning)
+- [convco](https://github.com/convco/convco) — conventional-commit checker used by hooks
+
+## Development
+
+| Command      | Description                                  |
+| ------------ | -------------------------------------------- |
+| `just check` | Run everything CI runs (format, lint, tests) |
+| `just test`  | Run the test suite                           |
+| `just fmt`   | Format code                                  |
+| `just lint`  | Clippy with warnings denied                  |
+| `just run`   | Launch the desktop app                       |
+
+## Git Hooks
+
+This project uses Lefthook. Pre-commit auto-formats staged Rust files; commit-msg
+validates the message is a conventional commit; pre-push runs the full CI check suite
+(format, clippy, tests, commit-range check) so pushes never fail CI.
+
+## CI/CD
+
+GitHub Actions runs format checks, clippy, tests on pushes to `master` and pull
+requests, plus conventional-commit validation on pull requests.
+
+## Releases & Changelog
+
+Releases are automated via [release-plz](https://github.com/release-plz/release-plz):
+a standing pull request tracks the next version bump; merging it tags the release and
+updates `CHANGELOG.md` (generated from Conventional Commits). Commit messages must
+follow [Conventional Commits](https://www.conventionalcommits.org/) — enforced by
+`convco` on commit, pre-push, and in CI.
+
+## License
+
+AGPL-3.0 — see [LICENSE](LICENSE) for details. External contributions require a CLA
+assigning rights to the project author.

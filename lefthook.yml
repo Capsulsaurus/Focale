@@ -1,0 +1,24 @@
+# Git hooks for Focale. pre-push replicates CI exactly (see justfile `check`).
+
+commit-msg:
+  commands:
+    conventional-commit:
+      run: convco check --from-stdin < {1}
+
+pre-commit:
+  commands:
+    format-fix:
+      glob: "**/*.rs"
+      stage_fixed: true
+      run: cargo fmt
+
+pre-push:
+  commands:
+    format-check:
+      run: cargo fmt --check
+    lint-check:
+      run: cargo clippy --workspace --all-targets -- -D warnings
+    test:
+      run: cargo test --workspace
+    conventional-commits:
+      run: convco check origin/master..HEAD

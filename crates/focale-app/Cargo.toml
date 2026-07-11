@@ -1,0 +1,12 @@
+[package]
+name = "focale-app"
+description = "Focale desktop application (winit + wgpu + egui)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+focale-core.workspace = true
+focale-sidecar.workspace = true

@@ -1,0 +1,12 @@
+[package]
+name = "focale-cli"
+description = "Headless export CLI for Focale — drives determinism CI"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+focale-core.workspace = true
+focale-sidecar.workspace = true
