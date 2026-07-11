@@ -19,6 +19,7 @@ fn fixture() -> std::path::PathBuf {
 }
 
 /// An edit state exercising every stage with non-default values.
+#[allow(clippy::field_reassign_with_default)]
 fn rich_edit() -> EditState {
     let mut edit = EditState::default();
     edit.white_balance = WhiteBalanceParams::Temperature {
