@@ -31,7 +31,12 @@ libm = "0.2"
 ort = { version = "2.0.0-rc.12", features = ["download-binaries", "ndarray"] }
 png = "0.18"
 rav1e = { version = "0.8", default-features = false }
-rawshift-image = { version = "0.1.1", features = ["arw", "dng"] }
+# default-features off: the default codec set pulls libwebp-sys, whose
+# rawshift 0.1.1 bindings do not compile on aarch64 (c_char signedness).
+rawshift-image = { version = "0.1.1", default-features = false, features = [
+    "arw",
+    "dng",
+] }
 rayon = "1"
 rfd = "0.15"
 serde = { version = "1", features = ["derive"] }
