@@ -3,6 +3,8 @@
 //! One sidecar per image, CBOR with RFC 8949 §4.2 Core Deterministic
 //! Encoding — identical edits always serialize to identical bytes.
 
+pub mod cde;
+
 /// The current sidecar schema version.
 ///
 /// Forward-versioned with the same permanent-compatibility rule as the

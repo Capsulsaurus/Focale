@@ -13,6 +13,8 @@ rust-version = "1.90"
 focale-core = { path = "crates/focale-core" }
 focale-sidecar = { path = "crates/focale-sidecar" }
 
+ciborium = "0.2"
+half = "2"
 serde = { version = "1", features = ["derive"] }
 thiserror = "2"
 tracing = "0.1"
