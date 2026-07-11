@@ -169,7 +169,19 @@ live-index block), copy/paste settings to multi-selection, multi-select edit
 broadcast, background export queue, persistent keyed status bar (active gamut,
 pipeline version, cursor colour, zoom, warnings).
 
-## 11. Determinism CI
+## 11. PRD §10 deliverables map
+
+| Deliverable | Where |
+| --- | --- |
+| Architecture decisions with rationale | this document |
+| Sidecar schema doc + deterministic-encoding golden tests | `docs/sidecar-schema.md`; `focale-sidecar/tests/golden.rs` (committed `canonical.fcl`, double-serialize and map-order-permutation byte equality) |
+| Determinism CI across x86_64 + aarch64 | `.github/workflows/determinism.yml` (renders `synthetic.dng` + `determinism.fcl` in every format on both arches and diffs hashes); in-process double-encode guard in `focale-cli/tests/determinism.rs` |
+| Pipeline-version regression suite | `focale-core/tests/pipeline.rs` (`rich_edit_matches_frozen_golden` — frozen hash; already caught one real glibc transcendental divergence, fixed by routing through `focale_core::math`/libm) |
+| Colour tests (working-space → display/export values per gamut/format) | `focale-core/src/color/*` (48 reference-value tests: matrices re-derived in f64, transfer round-trips, PQ/HLG anchors, Oklab, per-gamut mapping) + `focale-export/tests/export.rs` numeric probes (sRGB 16-bit value, PQ 203-nit value, cICP payloads, per-gamut encodes) |
+| Mask parity checklist (§4) as integration tests | `focale-core/tests/masks.rs` (28 tests: every shape, every op, feather/density, groups, determinism) + `focale-segment` unit/integration tests (subject/sky/background/object/person + parts) |
+| 20-in-30 workflow possible end-to-end | tooling shipped: keyboard culling, multi-select edit broadcast, copy/paste settings, background export queue; final timing validation requires a real shoot on a desktop session |
+
+## 12. Determinism CI
 
 - `focale-cli render <raw> <sidecar>` is the canonical export entry point.
 - CI job matrix: `ubuntu-24.04` (x86_64) and `ubuntu-24.04-arm` (aarch64) render the
