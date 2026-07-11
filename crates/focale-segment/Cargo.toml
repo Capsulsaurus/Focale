@@ -1,0 +1,16 @@
+[package]
+name = "focale-segment"
+description = "Local ONNX segmentation for Focale AI masks (ort runtime)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+focale-core.workspace = true
+
+flate2.workspace = true
+ort.workspace = true
+thiserror.workspace = true
+tracing.workspace = true

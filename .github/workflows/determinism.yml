@@ -1,0 +1,73 @@
+name: Determinism
+
+# PRD §10: export the same (raw + sidecar) on two architectures and diff
+# bytes. Runs the full workspace test suite (golden-file and regression
+# tests) on both, then byte-hashes focale-cli renders of the committed
+# fixture in every export format and compares across architectures.
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  render:
+    name: Render (${{ matrix.arch }})
+    strategy:
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            arch: x86_64
+          - runner: ubuntu-24.04-arm
+            arch: aarch64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Workspace tests (golden + regression suites)
+        run: cargo test --workspace
+      - name: Render fixture in every format and hash
+        run: |
+          set -euo pipefail
+          RAW=crates/focale-core/tests/fixtures/synthetic.dng
+          SIDECAR=crates/focale-cli/tests/fixtures/determinism.fcl
+          OUT=hashes-${{ matrix.arch }}.txt
+          : > "$OUT"
+          echo "working $(cargo run -q -p focale-cli -- hash "$RAW" --sidecar "$SIDECAR")" >> "$OUT"
+          for fmt in tiff16 png16 png8 jpeg jxl avif; do
+            hash=$(cargo run -q -p focale-cli -- render "$RAW" --sidecar "$SIDECAR" \
+              --format "$fmt" --gamut display-p3 --hash --out "/tmp/out.$fmt")
+            echo "$fmt $hash" >> "$OUT"
+          done
+          hash=$(cargo run -q -p focale-cli -- render "$RAW" --sidecar "$SIDECAR" \
+            --format avif --gamut rec2020 --hdr pq --hash --out /tmp/out-hdr.avif)
+          echo "avif-hdr-pq $hash" >> "$OUT"
+          hash=$(cargo run -q -p focale-cli -- render "$RAW" --sidecar "$SIDECAR" \
+            --format jxl --gamut rec2020 --hdr hlg --hash --out /tmp/out-hdr.jxl)
+          echo "jxl-hdr-hlg $hash" >> "$OUT"
+          cat "$OUT"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hashes-${{ matrix.arch }}
+          path: hashes-${{ matrix.arch }}.txt
+
+  compare:
+    name: Compare architectures
+    needs: render
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: hashes-*
+          merge-multiple: true
+      - name: Diff
+        run: |
+          set -euo pipefail
+          cat hashes-x86_64.txt
+          diff hashes-x86_64.txt hashes-aarch64.txt
+          echo "bit-identical across x86_64 and aarch64"
