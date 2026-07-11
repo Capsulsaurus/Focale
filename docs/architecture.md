@@ -117,15 +117,18 @@ isolated because model inference is explicitly *not* part of the deterministic p
   - TIFF 16-bit: `tiff` (MIT) — the hand-off format, with embedded ICC.
   - PNG: `png` (MIT/Apache) — 16-bit, cICP chunk for HDR (PQ) + ICC for SDR.
   - JPEG: `jpeg-encoder` (MIT/Apache) — 8-bit + ICC.
-  - JPEG XL: `jpegxl-rs`/libjxl (BSD-3) — 16-bit, lossless option, HDR (PQ/HLG).
+  - JPEG XL: `jpegxl-rs` (GPL-3.0-or-later bindings over BSD-3 libjxl; GPLv3 §13
+    makes GPL-3 works combinable with AGPL-3.0) — 16-bit, lossless option, HDR
+    (PQ/HLG).
   - AVIF: `rav1e` (BSD-2) + `avif-serialize` (BSD-3) — 10-bit, CICP-signaled
     PQ/HLG and wide gamut. Encoders run single-threaded with pinned settings so
     output bytes are reproducible.
   - All licenses verified AGPL-3.0-compatible.
 - **HDR→SDR tone mapping** *(pipeline-versioned)*: extended Reinhard
-  (white-point-preserving) on luminance in linear light. **Gamut mapping**
-  *(pipeline-versioned)*: hue-preserving soft clip toward the target gamut boundary
-  in Oklab. Gain-map export is deferred (seam kept in the export recipe schema —
+  (white-point-preserving) on max-RGB in linear light. **Gamut mapping**
+  *(pipeline-versioned)*: hue-preserving chroma compression in Oklab — binary
+  search on the (a,b) scale at constant L, fixed 20 iterations, no trig on the
+  mapping path. Gain-map export is deferred (seam kept in the export recipe schema —
   a recipe carries an optional `gain_map` block, rejected at execution in v1).
 
 ## 8. Preview architecture *(agent's choice)*
