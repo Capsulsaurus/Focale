@@ -14,8 +14,12 @@ focale-core = { path = "crates/focale-core" }
 focale-sidecar = { path = "crates/focale-sidecar" }
 
 ciborium = "0.2"
+flate2 = "1"
 half = "2"
+rawshift-image = { version = "0.1.1", features = ["arw", "dng"] }
+rayon = "1"
 serde = { version = "1", features = ["derive"] }
+sha2 = "0.10"
 thiserror = "2"
 tracing = "0.1"
 
