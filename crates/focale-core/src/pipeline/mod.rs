@@ -14,10 +14,16 @@ use crate::params::EditState;
 
 /// Everything a pipeline run needs.
 pub struct RenderInput<'a> {
-    /// The decoded raw image (linear camera RGB f32).
+    /// The decoded raw image (linear camera RGB f32). For preview renders
+    /// this may already be downscaled; `scale` says by how much.
     pub decoded: &'a DecodedRaw,
     /// The edit state to apply.
     pub edit: &'a EditState,
+    /// Ratio of `decoded`'s resolution to the native raw resolution
+    /// (1.0 = full-resolution export). Stages multiply pixel-dimensioned
+    /// parameters (blur radii, grain size, …) by this so previews stay
+    /// perceptually faithful to the export (PRD §2.1).
+    pub scale: f32,
 }
 
 /// The result of a pipeline run: a working-space image (linear Rec.2020,

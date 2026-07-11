@@ -8,7 +8,15 @@
 //! order, `rayon` only over disjoint rows, all whole-image statistics
 //! computed sequentially, no `HashMap` iteration on the pixel path.
 
+pub mod color_grade;
+pub mod detail;
+pub mod finishing;
+pub mod geometry;
+pub mod local;
 pub mod masks;
+pub mod retouch;
+pub mod tone;
+pub mod white_balance;
 
 use crate::image::ImageRgbF32;
 use crate::pipeline::{RenderInput, RenderOutput, RenderWarning};
