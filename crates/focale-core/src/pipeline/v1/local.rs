@@ -166,9 +166,9 @@ fn apply_local_params(image: &mut ImageRgbF32, params: &LocalParams) {
 
     // 2. Temperature / tint channel gains.
     if params.temperature != 0.0 || params.tint != 0.0 {
-        let gain_r = (params.temperature / 100.0 * 0.3).exp2();
-        let gain_b = (-params.temperature / 100.0 * 0.3).exp2();
-        let gain_g = (-params.tint / 100.0 * 0.2).exp2();
+        let gain_r = crate::math::exp2(params.temperature / 100.0 * 0.3);
+        let gain_b = crate::math::exp2(-params.temperature / 100.0 * 0.3);
+        let gain_g = crate::math::exp2(-params.tint / 100.0 * 0.2);
         image.data_mut().par_chunks_mut(stride).for_each(|row| {
             for px in row.chunks_exact_mut(3) {
                 px[0] *= gain_r;
@@ -182,7 +182,7 @@ fn apply_local_params(image: &mut ImageRgbF32, params: &LocalParams) {
     let wheel = wheel_offsets(&params.tint_wheel);
     let color_active = wheel.is_active() || params.vibrance != 0.0 || params.saturation != 0.0;
     if color_active {
-        let wheel_l_gain = wheel.l_exp.exp2();
+        let wheel_l_gain = crate::math::exp2(wheel.l_exp);
         let vibrance = params.vibrance;
         let saturation = params.saturation;
         image.data_mut().par_chunks_mut(stride).for_each(|row| {
@@ -337,9 +337,18 @@ mod tests {
         let cov = flat_coverage(1, 1, 1.0);
         apply_with_coverage(&mut img, &params, &cov);
         let [r, g, b] = img.pixel(0, 0);
-        assert!((r - 0.5 * 0.3_f32.exp2()).abs() < 1e-6, "r gains 2^0.3");
-        assert!((b - 0.5 * (-0.3_f32).exp2()).abs() < 1e-6, "b loses 2^0.3");
-        assert!((g - 0.5 * (-0.2_f32).exp2()).abs() < 1e-6, "g loses 2^0.2");
+        assert!(
+            (r - 0.5 * crate::math::exp2(0.3_f32)).abs() < 1e-6,
+            "r gains 2^0.3"
+        );
+        assert!(
+            (b - 0.5 * crate::math::exp2(-0.3_f32)).abs() < 1e-6,
+            "b loses 2^0.3"
+        );
+        assert!(
+            (g - 0.5 * crate::math::exp2(-0.2_f32)).abs() < 1e-6,
+            "g loses 2^0.2"
+        );
     }
 
     #[test]

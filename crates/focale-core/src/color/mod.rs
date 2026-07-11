@@ -14,14 +14,14 @@
 //! display transform post-v1 (PRD §5); nothing here assumes the working →
 //! display conversion is a single step.
 //!
-//! # Determinism caveat
+//! # Transcendentals
 //!
-//! Transcendental functions (`powf`, `cbrt`, `ln`, `exp`, `atan2`) resolve
-//! to the platform maths library. The determinism CI matrix
-//! (docs/architecture.md §11) validates that outputs are bit-identical
-//! across the supported targets; if a divergence is ever observed, the fix
-//! is to vendor a pure-Rust implementation of the affected functions behind
-//! a pipeline version bump.
+//! All transcendental functions (`powf`, `cbrt`, `ln`, `exp`, `atan2`) go
+//! through [`crate::math`], which wraps the pure-Rust `libm` crate: platform
+//! maths libraries differ across libc versions (a glibc 2.39 vs 2.42
+//! divergence was caught by the regression golden), so the export path
+//! never calls them. The determinism CI matrix (docs/architecture.md §11)
+//! guards this.
 
 pub mod adapt;
 pub mod gamut_map;

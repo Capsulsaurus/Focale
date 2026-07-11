@@ -143,8 +143,8 @@ fn warp(src: &ImageRgbF32, params: &GeometryParams) -> ImageRgbF32 {
     let hf = h as f32;
     let aspect = wf / hf;
     let theta = params.rotate.to_radians();
-    let cos_t = theta.cos();
-    let sin_t = theta.sin();
+    let cos_t = crate::math::cos(theta);
+    let sin_t = crate::math::sin(theta);
     let kv = params.perspective.vertical / 100.0;
     let kh = params.perspective.horizontal / 100.0;
 

@@ -440,7 +440,7 @@ fn gaussian_blur(src: &ImageGrayF32, sigma: f32) -> ImageGrayF32 {
     let mut kernel = Vec::with_capacity(radius + 1);
     for i in 0..=radius {
         let fi = i as f32;
-        kernel.push((-(fi * fi) * inv_two_sigma2).exp());
+        kernel.push(crate::math::exp(-(fi * fi) * inv_two_sigma2));
     }
     let mut sum = kernel[0];
     for k in kernel.iter().skip(1) {

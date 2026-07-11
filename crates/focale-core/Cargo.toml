@@ -9,6 +9,7 @@ rust-version.workspace = true
 
 [dependencies]
 flate2.workspace = true
+libm.workspace = true
 rawshift-image.workspace = true
 rayon.workspace = true
 serde.workspace = true

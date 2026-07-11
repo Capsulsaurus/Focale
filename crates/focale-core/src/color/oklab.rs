@@ -45,7 +45,11 @@ pub const OKLAB_M2_INV: Mat3 = Mat3([
 /// out-of-gamut colours) are handled without NaN.
 pub fn xyz_to_oklab(xyz: [f32; 3]) -> [f32; 3] {
     let lms = OKLAB_M1.mul_vec(xyz);
-    OKLAB_M2.mul_vec([lms[0].cbrt(), lms[1].cbrt(), lms[2].cbrt()])
+    OKLAB_M2.mul_vec([
+        crate::math::cbrt(lms[0]),
+        crate::math::cbrt(lms[1]),
+        crate::math::cbrt(lms[2]),
+    ])
 }
 
 /// Oklab `[L, a, b]` → CIE XYZ (D65, Y = 1). Inverse of [`xyz_to_oklab`].
@@ -58,13 +62,17 @@ pub fn oklab_to_xyz(lab: [f32; 3]) -> [f32; 3] {
 /// (−π, π] (`atan2` convention; 0 = the +a axis).
 pub fn oklab_to_oklch(lab: [f32; 3]) -> [f32; 3] {
     let chroma = (lab[1] * lab[1] + lab[2] * lab[2]).sqrt();
-    [lab[0], chroma, lab[2].atan2(lab[1])]
+    [lab[0], chroma, crate::math::atan2(lab[2], lab[1])]
 }
 
 /// Oklch `[L, C, h]` (hue in radians) → Oklab `[L, a, b]`. Inverse of
 /// [`oklab_to_oklch`].
 pub fn oklch_to_oklab(lch: [f32; 3]) -> [f32; 3] {
-    [lch[0], lch[1] * lch[2].cos(), lch[1] * lch[2].sin()]
+    [
+        lch[0],
+        lch[1] * crate::math::cos(lch[2]),
+        lch[1] * crate::math::sin(lch[2]),
+    ]
 }
 
 #[cfg(test)]

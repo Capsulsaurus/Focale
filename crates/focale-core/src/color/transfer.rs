@@ -22,7 +22,7 @@ pub fn srgb_encode(linear: f32) -> f32 {
     if l <= 0.0031308 {
         12.92 * l
     } else {
-        1.055 * l.powf(1.0 / 2.4) - 0.055
+        1.055 * crate::math::powf(l, 1.0 / 2.4) - 0.055
     }
 }
 
@@ -32,7 +32,7 @@ pub fn srgb_decode(signal: f32) -> f32 {
     if s <= 0.04045 {
         s / 12.92
     } else {
-        ((s + 0.055) / 1.055).powf(2.4)
+        crate::math::powf((s + 0.055) / 1.055, 2.4)
     }
 }
 
@@ -41,12 +41,12 @@ pub const ADOBE_RGB_GAMMA: f32 = 563.0 / 256.0;
 
 /// Linear light [0, 1] → Adobe RGB (1998) signal [0, 1]. Input clamped.
 pub fn adobe_rgb_encode(linear: f32) -> f32 {
-    linear.clamp(0.0, 1.0).powf(1.0 / ADOBE_RGB_GAMMA)
+    crate::math::powf(linear.clamp(0.0, 1.0), 1.0 / ADOBE_RGB_GAMMA)
 }
 
 /// Adobe RGB (1998) signal [0, 1] → linear light [0, 1]. Input clamped.
 pub fn adobe_rgb_decode(signal: f32) -> f32 {
-    signal.clamp(0.0, 1.0).powf(ADOBE_RGB_GAMMA)
+    crate::math::powf(signal.clamp(0.0, 1.0), ADOBE_RGB_GAMMA)
 }
 
 // SMPTE ST 2084 constants; every value is exactly representable in f32.
@@ -66,18 +66,18 @@ pub const PQ_SDR_WHITE_LUMINANCE: f32 = 203.0;
 /// (SMPTE ST 2084 inverse EOTF). Input clamped.
 pub fn pq_encode(linear: f32) -> f32 {
     let y = linear.clamp(0.0, 1.0);
-    let p = y.powf(PQ_M1);
-    ((PQ_C1 + PQ_C2 * p) / (1.0 + PQ_C3 * p)).powf(PQ_M2)
+    let p = crate::math::powf(y, PQ_M1);
+    crate::math::powf((PQ_C1 + PQ_C2 * p) / (1.0 + PQ_C3 * p), PQ_M2)
 }
 
 /// PQ signal [0, 1] → normalized linear light [0, 1] (1.0 = 10 000 cd/m²)
 /// (SMPTE ST 2084 EOTF). Input clamped.
 pub fn pq_decode(signal: f32) -> f32 {
     let s = signal.clamp(0.0, 1.0);
-    let p = s.powf(1.0 / PQ_M2);
+    let p = crate::math::powf(s, 1.0 / PQ_M2);
     let num = (p - PQ_C1).max(0.0);
     let den = PQ_C2 - PQ_C3 * p;
-    (num / den).powf(1.0 / PQ_M1)
+    crate::math::powf(num / den, 1.0 / PQ_M1)
 }
 
 /// SDR-referred linear light → PQ signal, mapping linear 1.0 to SDR
@@ -106,7 +106,7 @@ pub fn hlg_oetf(scene: f32) -> f32 {
     if e <= 1.0 / 12.0 {
         (3.0 * e).sqrt()
     } else {
-        HLG_A * (12.0 * e - HLG_B).ln() + HLG_C
+        HLG_A * crate::math::ln(12.0 * e - HLG_B) + HLG_C
     }
 }
 
@@ -117,7 +117,7 @@ pub fn hlg_oetf_inverse(signal: f32) -> f32 {
     if s <= 0.5 {
         (s * s) / 3.0
     } else {
-        (((s - HLG_C) / HLG_A).exp() + HLG_B) / 12.0
+        (crate::math::exp((s - HLG_C) / HLG_A) + HLG_B) / 12.0
     }
 }
 

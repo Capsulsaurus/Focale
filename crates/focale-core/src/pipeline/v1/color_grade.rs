@@ -137,7 +137,7 @@ pub fn apply(image: &mut ImageRgbF32, params: &ColorParams) {
             if hsl_active {
                 let c = (a * a + b * b).sqrt();
                 let e = smoothstep(0.0, 0.06, c);
-                let mut h_deg = b.atan2(a).to_degrees().rem_euclid(360.0);
+                let mut h_deg = crate::math::atan2(b, a).to_degrees().rem_euclid(360.0);
                 let mut hue_shift = 0.0_f32;
                 let mut sat_exp = 0.0_f32;
                 let mut lum_exp = 0.0_f32;
@@ -145,7 +145,9 @@ pub fn apply(image: &mut ImageRgbF32, params: &ColorParams) {
                     let d = (h_deg - center).abs();
                     let d = d.min(360.0 - d);
                     if d < HSL_BAND_WIDTH_DEG {
-                        let w = 0.5 * (1.0 + (std::f32::consts::PI * d / HSL_BAND_WIDTH_DEG).cos());
+                        let w = 0.5
+                            * (1.0
+                                + crate::math::cos(std::f32::consts::PI * d / HSL_BAND_WIDTH_DEG));
                         let we = w * e;
                         hue_shift += we * (params.hsl.hue[i] / 100.0) * 25.0;
                         sat_exp += we * params.hsl.saturation[i] / 100.0 * 0.7;
@@ -153,11 +155,11 @@ pub fn apply(image: &mut ImageRgbF32, params: &ColorParams) {
                     }
                 }
                 h_deg += hue_shift;
-                let c = c * sat_exp.exp2();
-                l *= lum_exp.exp2();
+                let c = c * crate::math::exp2(sat_exp);
+                l *= crate::math::exp2(lum_exp);
                 let h_rad = h_deg.to_radians();
-                a = c * h_rad.cos();
-                b = c * h_rad.sin();
+                a = c * crate::math::cos(h_rad);
+                b = c * crate::math::sin(h_rad);
             }
 
             // 2. Grading wheels (zone weights from the current Oklab L).
@@ -168,7 +170,7 @@ pub fn apply(image: &mut ImageRgbF32, params: &ColorParams) {
                 for (w, off) in [w_s, w_m, w_h].into_iter().zip(wheels.iter()) {
                     a += w * off.da;
                     b += w * off.db;
-                    l *= (w * off.l_exp).exp2();
+                    l *= crate::math::exp2(w * off.l_exp);
                 }
             }
 
@@ -229,8 +231,8 @@ impl WheelOffsets {
 pub(crate) fn wheel_offsets(wheel: &GradingWheel) -> WheelOffsets {
     let h = wheel.hue.to_radians();
     WheelOffsets {
-        da: wheel.saturation / 100.0 * 0.08 * h.cos(),
-        db: wheel.saturation / 100.0 * 0.08 * h.sin(),
+        da: wheel.saturation / 100.0 * 0.08 * crate::math::cos(h),
+        db: wheel.saturation / 100.0 * 0.08 * crate::math::sin(h),
         l_exp: wheel.luminance / 100.0 * 0.3,
     }
 }

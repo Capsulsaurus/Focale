@@ -7,6 +7,7 @@ pub mod color;
 pub mod decode;
 pub mod image;
 pub mod masks;
+pub mod math;
 pub mod params;
 pub mod pipeline;
 

@@ -134,7 +134,7 @@ impl ToneOps {
         let curve = (!curve.is_identity()).then(|| Curve::from_points(&curve.points));
         let curve_white = curve.as_ref().map_or(1.0, |c| srgb_decode(c.eval(1.0)));
         Self {
-            exposure_mul: exposure.exp2(),
+            exposure_mul: crate::math::exp2(exposure),
             contrast,
             gamma: 1.0 + contrast / 150.0,
             highlights,
@@ -153,7 +153,7 @@ impl ToneOps {
 
         // 2. Contrast (power curve pivoted at 0.18; skipped at 0).
         if self.contrast != 0.0 {
-            lp = 0.18 * (lp / 0.18).powf(self.gamma);
+            lp = 0.18 * crate::math::powf(lp / 0.18, self.gamma);
         }
 
         // 3. Region controls (skipped when all four sliders are 0).
@@ -161,13 +161,13 @@ impl ToneOps {
         {
             let l_enc = srgb_encode(lp); // srgb_encode clamps to [0, 1]
             let w_s = 1.0 - smoothstep(0.05, 0.55, l_enc);
-            let gain_s = (self.shadows / 100.0 * 0.9 * w_s).exp2();
+            let gain_s = crate::math::exp2(self.shadows / 100.0 * 0.9 * w_s);
             let w_h = if lp > 1.0 {
                 1.0
             } else {
                 smoothstep(0.45, 0.95, l_enc)
             };
-            let gain_h = (self.highlights / 100.0 * 0.8 * w_h).exp2();
+            let gain_h = crate::math::exp2(self.highlights / 100.0 * 0.8 * w_h);
             lp *= gain_s * gain_h;
 
             let w_w = if lp > 1.0 {
@@ -554,7 +554,7 @@ mod tests {
         };
         let mut img = ImageRgbF32::from_data(1, 1, vec![3.0, 3.0, 3.0]);
         apply(&mut img, &params);
-        let expected = 3.0 * (-0.8_f32).exp2();
+        let expected = 3.0 * crate::math::exp2(-0.8_f32);
         assert!((img.pixel(0, 0)[0] - expected).abs() < 1e-4);
     }
 

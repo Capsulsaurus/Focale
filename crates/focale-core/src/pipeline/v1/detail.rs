@@ -240,7 +240,7 @@ fn bilateral(
                     let v = src[sy * w + sx];
                     let d2 = (dx * dx + dy * dy) as f32;
                     let dl = v - centre;
-                    let wgt = (-(d2 * inv_2ss) - dl * dl * inv_2sr).exp();
+                    let wgt = crate::math::exp(-(d2 * inv_2ss) - dl * dl * inv_2sr);
                     num += wgt * v;
                     den += wgt;
                 }
@@ -269,7 +269,7 @@ fn gaussian_blur_plane(src: &[f32], w: usize, h: usize, sigma: f32, max_radius: 
     let mut weights = Vec::with_capacity(2 * radius + 1);
     for i in -(radius as isize)..=(radius as isize) {
         let fi = i as f32;
-        weights.push((-(fi * fi) * inv_2s2).exp());
+        weights.push(crate::math::exp(-(fi * fi) * inv_2s2));
     }
     let mut sum = 0.0_f32;
     for wgt in &weights {
@@ -583,7 +583,7 @@ mod tests {
         for y in 0..h {
             for x in 0..w {
                 let v = if x < 32 {
-                    0.3 + 0.01 * ((x as f32) * std::f32::consts::TAU / 8.0).sin()
+                    0.3 + 0.01 * crate::math::sin((x as f32) * std::f32::consts::TAU / 8.0)
                 } else if x < 48 {
                     0.3
                 } else {

@@ -27,6 +27,7 @@ flate2 = "1"
 half = "2"
 jpeg-encoder = "0.7"
 jpegxl-rs = { version = "0.15", features = ["vendored"] }
+libm = "0.2"
 ort = { version = "2.0.0-rc.12", features = ["download-binaries", "ndarray"] }
 png = "0.18"
 rav1e = { version = "0.8", default-features = false }

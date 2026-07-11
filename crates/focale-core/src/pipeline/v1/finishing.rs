@@ -110,7 +110,7 @@ fn vignette(image: &mut ImageRgbF32, p: &VignetteParams) {
                 let d_rect = u.abs().max(v.abs());
                 let d = d_rect + (d_circ - d_rect) * t;
                 let falloff = smoothstep(start, end, d);
-                let factor = (k * falloff).exp2();
+                let factor = crate::math::exp2(k * falloff);
                 row[x * 3] *= factor;
                 row[x * 3 + 1] *= factor;
                 row[x * 3 + 2] *= factor;
