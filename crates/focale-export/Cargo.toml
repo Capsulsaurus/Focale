@@ -14,6 +14,10 @@ focale-sidecar.workspace = true
 avif-serialize.workspace = true
 jpeg-encoder.workspace = true
 jpegxl-rs.workspace = true
+# Direct dependency on the -sys crate (already in the graph via jpegxl-rs)
+# solely to construct `JxlColorEncoding` values for exact colour signaling;
+# jpegxl-rs does not re-export the type.
+jpegxl-sys = { version = "0.13", default-features = false }
 png.workspace = true
 rav1e.workspace = true
 thiserror.workspace = true
