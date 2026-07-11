@@ -85,8 +85,9 @@ isolated because model inference is explicitly *not* part of the deterministic p
   (luminance, colour) are stored **parametrically** in the sidecar and rasterized on
   the CPU with fixed iteration order; rasterization is part of the versioned
   pipeline.
-- AI masks are resolved at creation time into 8-bit coverage bitmaps at 1/2 raw
-  resolution (quality/size balance), deflate-compressed in the sidecar
+- AI masks are resolved at creation time into 8-bit coverage bitmaps at 1/2 the
+  segmentation input resolution (the preview base in the app — quality/size
+  balance), deflate-compressed in the sidecar
   *(agent's choice: compressed bitmap over vectorization — exact, simple, and
   deterministic; vectorization would lose the model's soft edges)*. Export upsamples
   bilinearly — deterministic, versioned.
@@ -133,10 +134,14 @@ isolated because model inference is explicitly *not* part of the deterministic p
 
 ## 8. Preview architecture *(agent's choice)*
 
-- **One implementation of the pipeline math.** The CPU pipeline renders previews at
-  viewport resolution with per-stage caching (edit a stage → recompute that stage
-  and downstream only, on the downscaled input). The GPU does exactly one thing:
-  the colour-managed blit (working→display) plus zoom/pan sampling.
+- **One implementation of the pipeline math.** Decode happens once per image; the
+  result is immediately box-downscaled to a preview base (long edge ≤ 2560 px) and
+  the full-resolution buffer dropped. Every slider change re-runs the CPU pipeline
+  on that base — at this size a full re-run stays inside the latency budget, so v1
+  ships without per-stage caching (the seam for it is the preview scheduler). The
+  GPU does exactly one thing: the colour-managed blit (working→display) plus
+  zoom/pan sampling — its WGSL mirrors the CPU tone-map and gamut-map operators
+  and receives every colour matrix from `focale_core::color` constants.
 - **Rationale:** the PRD requires the GPU preview to be perceptually faithful to
   the CPU path forever, across every pipeline version. Duplicating eleven stages in
   WGSL doubles every algorithm and every version freeze; at preview resolution

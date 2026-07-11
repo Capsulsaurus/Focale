@@ -41,12 +41,29 @@ current editor's output.
 - Use Rust where possible for its memory guarantees and modern toolchain. Drop to C/C++ for native APIs if strictly necessary. Compile with LLVM for all targets.
 - Subsystems clearly define ownership of logic.
 
+## Getting Started
+
+```bash
+just run                     # launch the desktop app (Wayland/X11)
+scripts/fetch-models.sh      # optional: download the AI segmentation models
+cargo run -p focale-cli -- render photo.ARW --format tiff16   # headless export
+```
+
+Open a directory of raws (Sony lossless-compressed ARW or DNG in v1); cull with
+`1–5`/`P`/`X`/`U` and the arrow keys; edit with the ordered stage panels; multi-select
+in the filmstrip to broadcast edits or use *Copy settings → Paste to selection*;
+export runs in a background queue (`focale-export/` beside your raws). Edits live in
+`<file>.<ext>.fcl` sidecars — raws are never modified, and identical sidecars render
+bit-identically on any machine, forever. See `docs/architecture.md` and
+`docs/sidecar-schema.md`.
+
 ## Prerequisites
 
 - [Rust (rustup)](https://rustup.rs) — toolchain (pinned via `rust-toolchain.toml`)
 - [just](https://github.com/casey/just) — command runner
 - [Lefthook](https://github.com/evilmartians/lefthook) — git hooks manager (`lefthook install` after cloning)
 - [convco](https://github.com/convco/convco) — conventional-commit checker used by hooks
+- cmake + a C++ toolchain — builds the vendored libjxl for JPEG XL export
 
 ## Development
 
@@ -67,7 +84,9 @@ validates the message is a conventional commit; pre-push runs the full CI check 
 ## CI/CD
 
 GitHub Actions runs format checks, clippy, tests on pushes to `master` and pull
-requests, plus conventional-commit validation on pull requests.
+requests, plus conventional-commit validation on pull requests. A separate
+Determinism workflow renders the committed (raw + sidecar) fixture on x86_64 and
+aarch64 in every export format and fails if any byte differs (PRD §10).
 
 ## Releases & Changelog
 
