@@ -3,6 +3,9 @@
 //! Everything on the export path lives here and is CPU-only, bit-identical
 //! across machines and architectures. See `docs/architecture.md`.
 
+pub mod color;
+pub mod decode;
+pub mod image;
 pub mod masks;
 pub mod params;
 
