@@ -11,16 +11,23 @@ rust-version = "1.90"
 
 [workspace.dependencies]
 focale-core = { path = "crates/focale-core" }
+focale-export = { path = "crates/focale-export" }
 focale-sidecar = { path = "crates/focale-sidecar" }
 
+avif-serialize = "0.8"
 ciborium = "0.2"
 flate2 = "1"
 half = "2"
+jpeg-encoder = "0.7"
+jpegxl-rs = { version = "0.15", features = ["vendored"] }
+png = "0.18"
+rav1e = { version = "0.8", default-features = false }
 rawshift-image = { version = "0.1.1", features = ["arw", "dng"] }
 rayon = "1"
 serde = { version = "1", features = ["derive"] }
 sha2 = "0.10"
 thiserror = "2"
+tiff = "0.11"
 tracing = "0.1"
 
 [profile.release]

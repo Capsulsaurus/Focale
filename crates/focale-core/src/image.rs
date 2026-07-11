@@ -127,9 +127,112 @@ impl ImageRgbF32 {
     }
 }
 
+/// Single-channel f32 image (mask coverage, luminance planes), row-major.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ImageGrayF32 {
+    width: u32,
+    height: u32,
+    data: Vec<f32>,
+}
+
+impl ImageGrayF32 {
+    /// Creates a zero-filled plane.
+    pub fn new(width: u32, height: u32) -> Self {
+        Self {
+            width,
+            height,
+            data: vec![0.0; width as usize * height as usize],
+        }
+    }
+
+    /// Wraps existing data.
+    ///
+    /// # Panics
+    /// If `data.len() != width * height`.
+    pub fn from_data(width: u32, height: u32, data: Vec<f32>) -> Self {
+        assert_eq!(
+            data.len(),
+            width as usize * height as usize,
+            "plane buffer length must be width*height"
+        );
+        Self {
+            width,
+            height,
+            data,
+        }
+    }
+
+    /// Plane width in pixels.
+    pub fn width(&self) -> u32 {
+        self.width
+    }
+
+    /// Plane height in pixels.
+    pub fn height(&self) -> u32 {
+        self.height
+    }
+
+    /// The sample data.
+    pub fn data(&self) -> &[f32] {
+        &self.data
+    }
+
+    /// Mutable access to the sample data.
+    pub fn data_mut(&mut self) -> &mut [f32] {
+        &mut self.data
+    }
+
+    /// Reads one sample. Debug-asserted bounds.
+    #[inline]
+    pub fn get(&self, x: u32, y: u32) -> f32 {
+        debug_assert!(x < self.width && y < self.height);
+        self.data[y as usize * self.width as usize + x as usize]
+    }
+
+    /// Writes one sample. Debug-asserted bounds.
+    #[inline]
+    pub fn set(&mut self, x: u32, y: u32, v: f32) {
+        debug_assert!(x < self.width && y < self.height);
+        self.data[y as usize * self.width as usize + x as usize] = v;
+    }
+
+    /// Iterates over rows mutably (disjoint-row parallelism primitive).
+    pub fn rows_mut(&mut self) -> std::slice::ChunksMut<'_, f32> {
+        self.data.chunks_mut(self.width as usize)
+    }
+
+    /// Bilinearly samples at continuous coordinates, clamping at edges
+    /// (pixel-centre convention, like [`ImageRgbF32::sample_bilinear`]).
+    pub fn sample_bilinear(&self, x: f32, y: f32) -> f32 {
+        let max_x = (self.width - 1) as f32;
+        let max_y = (self.height - 1) as f32;
+        let x = x.clamp(0.0, max_x);
+        let y = y.clamp(0.0, max_y);
+        let x0 = x.floor();
+        let y0 = y.floor();
+        let fx = x - x0;
+        let fy = y - y0;
+        let x0 = x0 as u32;
+        let y0 = y0 as u32;
+        let x1 = (x0 + 1).min(self.width - 1);
+        let y1 = (y0 + 1).min(self.height - 1);
+        let top = self.get(x0, y0) * (1.0 - fx) + self.get(x1, y0) * fx;
+        let bottom = self.get(x0, y1) * (1.0 - fx) + self.get(x1, y1) * fx;
+        top * (1.0 - fy) + bottom * fy
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn gray_roundtrip_and_sampling() {
+        let mut g = ImageGrayF32::new(2, 1);
+        g.set(1, 0, 1.0);
+        assert_eq!(g.get(0, 0), 0.0);
+        assert_eq!(g.sample_bilinear(0.5, 0.0), 0.5);
+    }
 
     #[test]
     fn pixel_roundtrip() {

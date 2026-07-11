@@ -8,6 +8,7 @@ pub mod decode;
 pub mod image;
 pub mod masks;
 pub mod params;
+pub mod pipeline;
 
 /// The current pipeline version.
 ///
