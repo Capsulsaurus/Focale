@@ -57,10 +57,11 @@
 //!
 //! ## Tint
 //!
-//! `y ← y − tint · 0.0005`. **Pinned**: positive tint *lowers* `y`, placing
-//! the assumed white below the locus on the magenta side (magenta is below
-//! the Planckian/daylight locus in CIE 1931 `y`); negative tint raises `y`
-//! toward green. One tint unit moves `y` by 0.0005.
+//! `y ← y + tint · 0.0005`. **Pinned**: positive tint *raises* `y`, placing
+//! the assumed white above the locus on the green side; the compensation
+//! therefore renders the image toward magenta — matching the universal
+//! raw-developer convention that positive tint = magenta. Negative tint
+//! renders toward green. One tint unit moves `y` by 0.0005.
 //!
 //! # 2. Camera → Rec.2020 matrix
 //!
@@ -125,7 +126,7 @@ fn wb_gains(wb: &WhiteBalanceParams, meta: &RawMetadata) -> [f32; 3] {
         WhiteBalanceParams::Custom { red, blue } => [red, 1.0, blue],
         WhiteBalanceParams::Temperature { kelvin, tint } => {
             let [x, y] = locus_xy(f64::from(kelvin));
-            let y = y - f64::from(tint) * 0.0005;
+            let y = y + f64::from(tint) * 0.0005;
             let white = xy_to_xyz([x, y]);
             let neutral64 = match meta.xyz_to_camera {
                 Some(rows) => mul_vec3_f64(&to_f64(rows), white),
@@ -334,10 +335,11 @@ mod tests {
     }
 
     #[test]
-    fn positive_tint_lowers_assumed_white_y() {
-        // Pinned direction: positive tint shifts the assumed white below the
-        // locus (magenta side), which lowers the red/blue gains relative to
-        // green for an sRGB camera.
+    fn positive_tint_renders_toward_magenta() {
+        // Pinned direction: positive tint shifts the assumed white above the
+        // locus (green side), so the compensating red/blue gains rise
+        // relative to green — the image renders toward magenta, matching the
+        // universal raw-developer convention.
         let meta = srgb_camera_meta(None);
         let g = |tint: f32| {
             wb_gains(
@@ -350,8 +352,8 @@ mod tests {
         };
         let neutral = g(0.0);
         let magenta = g(50.0);
-        assert!(magenta[0] < neutral[0]);
-        assert!(magenta[2] < neutral[2]);
+        assert!(magenta[0] > neutral[0]);
+        assert!(magenta[2] > neutral[2]);
         assert_eq!(magenta[1], 1.0);
     }
 
