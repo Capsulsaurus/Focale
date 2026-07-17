@@ -70,7 +70,7 @@ telemetry, accounts.
 | `focale-segment` | ONNX segmentation (ort). Used only at mask-creation time; never on the export path. |
 | `focale-buildinfo` | Build provenance strings (release version + git short hash, platform name) for the writing binaries; keeps the deterministic-path crates free of build scripts. |
 | `focale-cli` | Headless export binary. The reference deterministic path; CI runs it on x86_64 + aarch64 and diffs bytes. |
-| `focale-app` | Desktop GUI (winit + wgpu + egui). Depends on core/sidecar/segment/export/buildinfo. |
+| `focale-app` | Desktop GUI (eframe = winit + wgpu + egui, §12). Depends on core/sidecar/segment/export/buildinfo. |
 
 **Rationale:** the export path must be testable headless on CI across
 architectures, so nothing in `focale-core` may depend on GUI or GPU crates.
@@ -262,11 +262,34 @@ nest into named groups.
   Rec.2020 → the display space. Assume professional users on ~Display P3 D65
   hardware, but never hard-code the assumption. **Current reality:** v1 assumes
   an sRGB surface (the shader sRGB-encodes when the swapchain format is not
-  already sRGB); querying the compositor (Wayland `wp_color_management_v1`,
-  macOS tagged `CAMetalLayer`) and the user-set display profile are
-  **unimplemented** — tracked in issues #6 and #10. The seam is the viewport
-  uniform block, which already receives every colour matrix from
-  `focale_core::color` constants.
+  already sRGB); wide-gamut surface output is **unimplemented** — tracked in
+  issues #6 and #10. The seam is the viewport uniform block, which already
+  receives every colour matrix from `focale_core::color` constants.
+- **Wide-gamut display path (verified 2026-07, not yet wired):** wgpu 30.0.0
+  (2026-07-01) added `SurfaceConfiguration::color_space` +
+  `SurfaceCapabilities::format_capabilities`, letting the swapchain be
+  configured as e.g. `SurfaceColorSpace::DisplayP3`. Per-platform reality:
+  - **macOS (Metal):** the broadest support in wgpu — `DisplayP3`,
+    `ExtendedDisplayP3`, extended-linear (EDR), and BT.2100 PQ/HLG. This is the
+    "tagged `CAMetalLayer`" requirement, satisfied through the same wgpu API.
+  - **Linux/Wayland:** the full chain ships today: Mesa ≥ 25.1 implements
+    `VK_EXT_swapchain_colorspace` (+ `VK_EXT_hdr_metadata`) in its Wayland
+    Vulkan WSI by speaking `wp_color_management_v1` (wayland-protocols ≥ 1.41
+    staging, Feb 2025) to the compositor — the protocol is handled by the
+    driver on our `wl_surface`, so no winit support is required. Compositors
+    shipping the protocol: GNOME 48+ (mutter), KDE Plasma 6.3+ (KWin),
+    wlroots 0.19+ (Sway et al.), Hyprland. **Verified claim: wide-gamut
+    (Display P3) preview output on Linux is supportable — on Wayland only.**
+  - **Linux/X11: incapable, permanently.** X.org has no colour-management
+    protocol and Mesa's X11 WSI exposes only sRGB; the `x11` cargo feature
+    exists solely so the binary can compile there (not targeted, not
+    recommended, sRGB forever — §12).
+  - **Blocker:** eframe/egui 0.35 (latest as of July 2026) pins wgpu 29, which
+    predates the colour-space API; wiring this waits on egui's wgpu 30 upgrade
+    (issues #6/#10). Integration note for then: one surface has one colour
+    space, so when the surface is not sRGB, egui chrome (authored in sRGB)
+    must be converted to the surface space in the render pass — chrome needs
+    no colour *precision* (§12), but it does need the correct primaries.
 - **HARD:** the GUI has a user-selectable **active rendering gamut** (sRGB,
   Display P3, Adobe RGB), always visible as a status-bar key (§11).
 - **HDR→SDR tone mapping** *(pipeline-versioned)*: extended Reinhard
@@ -391,11 +414,19 @@ nest into named groups.
   stack must not preclude Windows/X11, but no effort is spent on them. Current
   reality: Linux is exercised by CI on both architectures; macOS has no CI and no
   platform-specific code yet — tracked in issue #10.
-- **GUI stack:** `winit` + `wgpu` + `egui`. Rationale: the image viewport must be
-  a custom colour-managed render pass under our control (§8), which rules out
-  webview stacks; egui rides the same wgpu surface for panels and keeps the whole
-  app in Rust. UI chrome does not require colour precision; the viewport shader
-  does.
+- **GUI stack:** `eframe` (currently 0.35 = `winit` 0.30 + `wgpu` 29 + `egui`
+  0.35). Rationale: the image viewport must be a custom colour-managed render
+  pass under our control (§8), which rules out webview stacks; egui rides the
+  same wgpu surface for panels and keeps the whole app in Rust. UI chrome does
+  not require colour precision; the viewport shader does.
+- **Colour-management capability per target (verified 2026-07, details §8):**
+  wide-gamut display output is supportable on macOS (Metal) and on
+  Linux/**Wayland** (Mesa ≥ 25.1 + a `wp_color_management_v1` compositor:
+  GNOME 48+, Plasma 6.3+, wlroots 0.19+, Hyprland), pending the stack's move
+  to wgpu ≥ 30. Linux/X11 is **incapable** of colour management (no protocol
+  exists; Mesa's X11 WSI is sRGB-only) — the app may compile there via the
+  `x11` feature but X11 is not a target and running it is not recommended for
+  any reason.
 - **Preview performance target:** slider-to-screen update < 100 ms at
   fit-to-window zoom on a base Apple-silicon Mac; full-resolution CPU export may
   be slower — correct beats fast on the export path. (Unmeasured; issue #11.)
