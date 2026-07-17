@@ -131,8 +131,8 @@ fn fs_main(in: VsOut) -> @location(0) vec4<f32> {
     }
     let working = textureSample(t_image, s_image, uv).rgb;
     let toned = tonemap(working, u.params.x);
-    let target = map_to_gamut(toned);
-    var display = clamp(mul3(u.target_to_display, target), vec3<f32>(0.0), vec3<f32>(1.0));
+    let gamut_mapped = map_to_gamut(toned);
+    var display = clamp(mul3(u.target_to_display, gamut_mapped), vec3<f32>(0.0), vec3<f32>(1.0));
     if u.params.y >= 0.5 {
         display = vec3<f32>(
             srgb_encode(display.r),
