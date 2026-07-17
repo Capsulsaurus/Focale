@@ -38,8 +38,6 @@ pub struct PreviewFrame {
     pub warnings: Vec<RenderWarning>,
     /// Monotonic version for GPU upload deduplication.
     pub version: u64,
-    /// Path of the source raw (guards stale results after selection moves).
-    pub path: PathBuf,
 }
 
 /// Decodes `path` and builds the preview base.
@@ -99,21 +97,27 @@ fn downscale_box(src: &DecodedRaw, factor: u32) -> DecodedRaw {
     }
 }
 
-/// Runs the pipeline on the preview base.
-pub fn render(base: &PreviewBase, edit: &EditState, version: u64) -> PreviewFrame {
+/// Runs the pipeline on the preview base with the sidecar's stored
+/// pipeline version — previews must show what an export of that sidecar
+/// would produce, never silently the current algorithms. Fails (rather
+/// than panics) for versions this build does not implement.
+pub fn render(
+    base: &PreviewBase,
+    edit: &EditState,
+    pipeline_version: u32,
+    version: u64,
+) -> Result<PreviewFrame, pipeline::RenderError> {
     let input = RenderInput {
         decoded: &base.decoded,
         edit,
         scale: base.scale,
     };
-    let out = pipeline::render(&input, focale_core::PIPELINE_VERSION)
-        .expect("current pipeline version is always supported");
-    PreviewFrame {
+    let out = pipeline::render(&input, pipeline_version)?;
+    Ok(PreviewFrame {
         image: out.image,
         warnings: out.warnings,
         version,
-        path: base.path.clone(),
-    }
+    })
 }
 
 #[cfg(test)]
@@ -146,5 +150,45 @@ mod tests {
         assert_eq!((out.width, out.height), (2, 1));
         // Block (0,0): pixels 0 and 1 of rows 0/1 → r = mean(0, 3, 12, 15).
         assert_eq!(out.pixels[0], (0.0 + 3.0 + 12.0 + 15.0) / 4.0);
+    }
+
+    fn tiny_base() -> PreviewBase {
+        PreviewBase {
+            path: PathBuf::from("test.dng"),
+            decoded: Arc::new(DecodedRaw {
+                width: 2,
+                height: 2,
+                pixels: vec![0.5; 12],
+                metadata: RawMetadata {
+                    camera_make: None,
+                    camera_model: None,
+                    as_shot_neutral: None,
+                    xyz_to_camera: None,
+                    orientation: 1,
+                    capture_time: None,
+                    iso: None,
+                    exposure_time: None,
+                    f_number: None,
+                    focal_length: None,
+                    lens_model: None,
+                    optics: Default::default(),
+                },
+            }),
+            scale: 1.0,
+        }
+    }
+
+    #[test]
+    fn render_dispatches_stored_version() {
+        let base = tiny_base();
+        let edit = EditState::default();
+        assert!(render(&base, &edit, focale_core::PIPELINE_VERSION, 0).is_ok());
+    }
+
+    #[test]
+    fn render_future_version_errors_not_panics() {
+        let base = tiny_base();
+        let edit = EditState::default();
+        assert!(render(&base, &edit, focale_core::PIPELINE_VERSION + 1, 0).is_err());
     }
 }

@@ -458,12 +458,32 @@ pub fn rating_widget(ui: &mut Ui, rating: &mut u8) -> bool {
 
 /// Draws warnings text for the status bar (missing optics metadata etc.).
 pub fn warning_text(warnings: &[RenderWarning]) -> String {
-    let mut parts = Vec::new();
+    let mut parts: Vec<String> = Vec::new();
     for w in warnings {
         match w {
-            RenderWarning::OpticsMetadataMissing => parts.push("no optics metadata"),
-            RenderWarning::CameraMatrixMissing => parts.push("no camera colour matrix"),
+            RenderWarning::OpticsMetadataMissing => parts.push("no optics metadata".into()),
+            RenderWarning::CameraMatrixMissing => parts.push("no camera colour matrix".into()),
+            RenderWarning::OlderPipelineVersion(v) => {
+                parts.push(format!("edited with older pipeline v{v}"));
+            }
         }
     }
     parts.join(" · ")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn warning_text_covers_every_variant() {
+        assert_eq!(warning_text(&[]), "");
+        assert_eq!(
+            warning_text(&[
+                RenderWarning::OpticsMetadataMissing,
+                RenderWarning::OlderPipelineVersion(1),
+            ]),
+            "no optics metadata · edited with older pipeline v1"
+        );
+    }
 }

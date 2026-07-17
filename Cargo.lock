@@ -1328,6 +1328,7 @@ name = "focale-app"
 version = "0.1.0"
 dependencies = [
  "eframe",
+ "focale-buildinfo",
  "focale-core",
  "focale-export",
  "focale-segment",
@@ -1347,6 +1348,7 @@ version = "0.1.0"
 name = "focale-cli"
 version = "0.1.0"
 dependencies = [
+ "focale-buildinfo",
  "focale-core",
  "focale-export",
  "focale-sidecar",

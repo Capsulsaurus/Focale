@@ -8,6 +8,7 @@ repository.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+focale-buildinfo.workspace = true
 focale-core.workspace = true
 focale-export.workspace = true
 focale-sidecar.workspace = true

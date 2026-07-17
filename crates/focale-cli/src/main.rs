@@ -48,7 +48,7 @@ fn main() -> ExitCode {
 fn version_line() -> String {
     format!(
         "focale-cli {} (pipeline v{}, sidecar schema v{})",
-        env!("CARGO_PKG_VERSION"),
+        focale_buildinfo::version(),
         focale_core::PIPELINE_VERSION,
         focale_sidecar::SCHEMA_VERSION,
     )

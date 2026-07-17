@@ -44,6 +44,10 @@ pub enum RenderWarning {
     OpticsMetadataMissing,
     /// The camera model has no colour calibration; a generic matrix was used.
     CameraMatrixMissing,
+    /// The edit was made with an older pipeline version and renders with
+    /// that version's algorithms — never silently upgraded. Only an
+    /// explicit user action re-stamps a sidecar's `pipeline_version`.
+    OlderPipelineVersion(u32),
 }
 
 /// Errors from a pipeline run.
@@ -57,8 +61,15 @@ pub enum RenderError {
 /// Runs the pipeline at `version` (stages 2–10; the output transform is a
 /// separate export-side step so previews can reuse the working image).
 pub fn render(input: &RenderInput<'_>, version: u32) -> Result<RenderOutput, RenderError> {
-    match version {
-        1 => Ok(v1::render(input)),
-        v => Err(RenderError::UnsupportedVersion(v)),
+    let mut out = match version {
+        1 => v1::render(input),
+        v => return Err(RenderError::UnsupportedVersion(v)),
+    };
+    // Unreachable while PIPELINE_VERSION == 1; becomes live the moment a
+    // v2 exists, with no dispatcher changes beyond the new match arm.
+    if version < crate::PIPELINE_VERSION {
+        out.warnings
+            .push(RenderWarning::OlderPipelineVersion(version));
     }
+    Ok(out)
 }

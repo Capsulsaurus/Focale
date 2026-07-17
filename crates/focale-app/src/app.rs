@@ -9,8 +9,8 @@ use eframe::egui::{self, Color32, ColorImage, Key, RichText, TextureHandle};
 use focale_core::color::{Gamut, luminance_rec2020, map_to_gamut, srgb_encode};
 use focale_core::params::EditState;
 use focale_core::pipeline::RenderWarning;
-use focale_sidecar::SidecarDoc;
 use focale_sidecar::schema::Flag;
+use focale_sidecar::{SidecarDoc, SidecarError};
 
 use crate::export_queue::{self, ExportItem, ExportStatus};
 use crate::jobs::{JobHandle, Priority, Scheduler};
@@ -25,7 +25,7 @@ use crate::viewport::{self, ViewportCallback, ViewportRenderer};
 enum Msg {
     Base(PathBuf, Result<PreviewBase, String>),
     AiMask(PathBuf, Result<focale_core::masks::ResolvedMask, String>),
-    Frame(Box<PreviewFrame>),
+    Frame(PathBuf, Result<Box<PreviewFrame>, String>),
     Thumb(PathBuf, ColorImage),
     Export(usize, ExportStatus),
     Suggest(PathBuf, SuggestionSet),
@@ -69,6 +69,12 @@ pub struct FocaleApp {
     render_pending: Option<JobHandle>,
     render_version: u64,
     warnings: Vec<RenderWarning>,
+    /// Last pipeline render failure for the primary image (e.g. a sidecar
+    /// stamped with a pipeline version this build does not implement).
+    render_error: Option<String>,
+    /// Sidecars that exist on disk but failed to load (e.g. written by a
+    /// newer schema). Never saved, so Focale cannot clobber a newer file.
+    unloadable: HashSet<PathBuf>,
 
     /// Filmstrip thumbnails.
     thumbs: HashMap<PathBuf, TextureHandle>,
@@ -133,6 +139,8 @@ impl FocaleApp {
             render_pending: None,
             render_version: 0,
             warnings: Vec::new(),
+            render_error: None,
+            unloadable: HashSet::new(),
             thumbs: HashMap::new(),
             thumbs_requested: HashSet::new(),
             gamut: Gamut::Srgb,
@@ -164,6 +172,8 @@ impl FocaleApp {
                 self.bases.clear();
                 self.base_order.clear();
                 self.frame = None;
+                self.render_error = None;
+                self.unloadable.clear();
                 self.thumbs.clear();
                 self.thumbs_requested.clear();
                 self.request_primary_preview();
@@ -174,12 +184,31 @@ impl FocaleApp {
         }
     }
 
-    /// The sidecar doc for a path, created with defaults when absent.
+    /// The sidecar doc for a path, created with defaults when absent. A
+    /// sidecar that exists but fails to load (newer schema, corruption) is
+    /// remembered in `unloadable` and never saved back — defaults are used
+    /// in memory, but the file on disk is left untouched.
     fn doc_mut(&mut self, path: &std::path::Path) -> &mut SidecarDoc {
-        self.docs.entry(path.to_path_buf()).or_insert_with(|| {
-            SidecarDoc::load(&focale_sidecar::sidecar_path_for(path))
-                .unwrap_or_else(|_| SidecarDoc::new_default(focale_core::PIPELINE_VERSION))
-        })
+        if !self.docs.contains_key(path) {
+            let sidecar = focale_sidecar::sidecar_path_for(path);
+            let doc = match SidecarDoc::load(&sidecar) {
+                Ok(doc) => doc,
+                Err(SidecarError::Io(e)) if e.kind() == std::io::ErrorKind::NotFound => {
+                    SidecarDoc::new_default(focale_core::PIPELINE_VERSION)
+                }
+                Err(e) => {
+                    tracing::error!(
+                        "sidecar load failed for {} ({e}); editing in memory only, \
+                         the file on disk will not be overwritten",
+                        sidecar.display()
+                    );
+                    self.unloadable.insert(path.to_path_buf());
+                    SidecarDoc::new_default(focale_core::PIPELINE_VERSION)
+                }
+            };
+            self.docs.insert(path.to_path_buf(), doc);
+        }
+        self.docs.get_mut(path).expect("inserted above")
     }
 
     fn primary_path(&self) -> Option<PathBuf> {
@@ -191,6 +220,8 @@ impl FocaleApp {
         let Some(path) = self.primary_path() else {
             return;
         };
+        // A stale render failure must not outlive the selection it came from.
+        self.render_error = None;
         if let Some(base) = self.bases.get(&path).cloned() {
             self.spawn_render(base);
         } else if !self.decoding.contains(&path) {
@@ -210,11 +241,11 @@ impl FocaleApp {
         }
         self.render_version += 1;
         let version = self.render_version;
-        let mut edit = self
-            .docs
-            .get(&base.path)
-            .map(|d| d.edit.clone())
-            .unwrap_or_default();
+        // Force-load the doc so the preview uses the sidecar's stored
+        // pipeline version, never silently the current one.
+        let doc = self.doc_mut(&base.path);
+        let pipeline_version = doc.pipeline_version;
+        let mut edit = doc.edit.clone();
         // Tools that paint in image coordinates need the un-warped frame.
         if matches!(
             self.tool,
@@ -230,9 +261,12 @@ impl FocaleApp {
             edit.geometry.crop = None;
         }
         let tx = self.tx.clone();
+        let path = base.path.clone();
         let handle = self.scheduler.submit(Priority::Preview, move || {
-            let frame = preview::render(&base, &edit, version);
-            let _ = tx.send(Msg::Frame(Box::new(frame)));
+            let result = preview::render(&base, &edit, pipeline_version, version)
+                .map(Box::new)
+                .map_err(|e| e.to_string());
+            let _ = tx.send(Msg::Frame(path, result));
         });
         self.render_pending = Some(handle);
     }
@@ -254,7 +288,10 @@ impl FocaleApp {
         for p in selected_paths {
             let doc = self.doc_mut(&p);
             doc.edit = edit.clone();
-            doc.pipeline_version = focale_core::PIPELINE_VERSION;
+            // Editing never re-stamps `pipeline_version`: each doc keeps
+            // rendering with its stored version (even across a mixed-version
+            // multi-selection) until the user explicitly upgrades it via the
+            // status-bar action.
             self.dirty.insert(p, now);
         }
         self.suggestions = SuggestionSet::default();
@@ -274,12 +311,22 @@ impl FocaleApp {
             .collect();
         for path in due {
             self.dirty.remove(&path);
+            if self.unloadable.contains(&path) {
+                tracing::warn!(
+                    "not saving {}: its on-disk sidecar failed to load and must not be clobbered",
+                    path.display()
+                );
+                continue;
+            }
             // Keep live-index in sync with session state before saving.
             if let Some(entry) = self.session.entries.iter().find(|e| e.path == path) {
                 let live = entry.live.clone();
                 let doc = self.doc_mut(&path);
                 doc.live_index = live;
             }
+            // Debug provenance: which build/OS last wrote this file.
+            self.doc_mut(&path)
+                .set_provenance(&focale_buildinfo::version(), focale_buildinfo::platform());
             let doc = self.doc_mut(&path).clone();
             let sidecar = focale_sidecar::sidecar_path_for(&path);
             if let Err(e) = doc.save(&sidecar) {
@@ -321,7 +368,10 @@ impl FocaleApp {
             .filter_map(|&i| self.session.entries.get(i).map(|e| e.path.clone()))
             .collect();
         for path in paths {
-            let edit = self.doc_mut(&path).edit.clone();
+            let (edit, pipeline_version) = {
+                let doc = self.doc_mut(&path);
+                (doc.edit.clone(), doc.pipeline_version)
+            };
             let index = self.exports.len();
             self.exports.push(ExportItem {
                 source: path.clone(),
@@ -339,7 +389,7 @@ impl FocaleApp {
                         edit: &edit,
                         scale: 1.0,
                     };
-                    let out = focale_core::pipeline::render(&input, focale_core::PIPELINE_VERSION)
+                    let out = focale_core::pipeline::render(&input, pipeline_version)
                         .map_err(|e| e.to_string())?;
                     let bytes =
                         focale_export::encode(&out.image, &recipe).map_err(|e| e.to_string())?;
@@ -382,14 +432,23 @@ impl FocaleApp {
                     self.warnings.clear();
                     self.frame = None;
                 }
-                Msg::Frame(f) => {
-                    if Some(&f.path) == self.primary_path().as_ref()
+                Msg::Frame(path, Ok(f)) => {
+                    if Some(&path) == self.primary_path().as_ref()
                         && f.version >= self.frame_uploaded
                     {
                         self.warnings = f.warnings.clone();
+                        self.render_error = None;
                         self.upload_frame(frame, &f);
                         self.frame = Some(*f);
                         self.schedule_suggestions(false);
+                    }
+                }
+                Msg::Frame(path, Err(e)) => {
+                    if Some(&path) == self.primary_path().as_ref() {
+                        tracing::error!("render failed for {}: {e}", path.display());
+                        self.warnings.clear();
+                        self.frame = None;
+                        self.render_error = Some(e);
                     }
                 }
                 Msg::Thumb(path, image) => {
@@ -545,6 +604,18 @@ impl eframe::App for FocaleApp {
                     .map(|d| d.pipeline_version)
                     .unwrap_or(focale_core::PIPELINE_VERSION);
                 ui.label(format!("Pipeline: v{pv}"));
+                // The one place a sidecar's pipeline version ever changes:
+                // an explicit user upgrade to the current algorithms.
+                if pv < focale_core::PIPELINE_VERSION
+                    && ui
+                        .small_button(format!("Upgrade to v{}", focale_core::PIPELINE_VERSION))
+                        .clicked()
+                    && let Some(path) = self.primary_path()
+                {
+                    self.doc_mut(&path).pipeline_version = focale_core::PIPELINE_VERSION;
+                    self.dirty.insert(path, Instant::now());
+                    self.request_primary_preview();
+                }
                 ui.separator();
                 match self.cursor_probe {
                     Some((wk, disp)) => ui.label(format!(
@@ -560,11 +631,15 @@ impl eframe::App for FocaleApp {
                 };
                 ui.label(format!("Zoom: {zoom_label}"));
                 ui.separator();
-                let warn = panels::warning_text(&self.warnings);
-                if warn.is_empty() {
-                    ui.label("No warnings");
+                if let Some(err) = &self.render_error {
+                    ui.colored_label(ui.visuals().error_fg_color, format!("✘ {err}"));
                 } else {
-                    ui.colored_label(ui.visuals().warn_fg_color, format!("⚠ {warn}"));
+                    let warn = panels::warning_text(&self.warnings);
+                    if warn.is_empty() {
+                        ui.label("No warnings");
+                    } else {
+                        ui.colored_label(ui.visuals().warn_fg_color, format!("⚠ {warn}"));
+                    }
                 }
             });
         });

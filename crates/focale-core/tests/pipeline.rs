@@ -164,6 +164,29 @@ fn unsupported_version_is_rejected() {
 }
 
 #[test]
+fn current_version_emits_no_older_pipeline_warning() {
+    // The positive case (rendering v1 under a build whose PIPELINE_VERSION
+    // is 2) becomes testable when a v2 exists; until then assert the
+    // current version never claims to be old.
+    let decoded = decode_file(&fixture()).expect("fixture decodes");
+    let edit = EditState::default();
+    let out = render(
+        &RenderInput {
+            decoded: &decoded,
+            edit: &edit,
+            scale: 1.0,
+        },
+        focale_core::PIPELINE_VERSION,
+    )
+    .unwrap();
+    assert!(
+        !out.warnings
+            .iter()
+            .any(|w| matches!(w, RenderWarning::OlderPipelineVersion(_)))
+    );
+}
+
+#[test]
 fn rich_edit_renders_deterministically() {
     let edit = rich_edit();
     let (h1, w, h) = working_hash(&edit, 1.0);
