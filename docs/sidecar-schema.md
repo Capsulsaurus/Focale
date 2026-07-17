@@ -20,6 +20,9 @@ encoder); the byte-level contract is frozen by the golden test fixture
   block, and export recipes.
 - A sidecar plus the raw file plus the recorded pipeline version is
   sufficient to reproduce an export **bit-identically, forever**.
+- The document also carries two debug-provenance fields
+  (`focale_version`, `focale_platform`, §5.1) recording which build last
+  wrote it. They are informational only and never influence rendering.
 
 ## 2. Encoding
 
@@ -49,6 +52,12 @@ Writers MUST produce RFC 8949 **§4.2 Core Deterministic Encoding**:
 
 Identical documents therefore always serialize to identical bytes — this
 is what makes sidecar bytes hashable and diffable in CI.
+
+Note the carve-out: identical *edits* on different machines or builds do
+**not** imply identical sidecar bytes, because the debug-provenance
+fields `focale_version` / `focale_platform` (§5.1) vary by writer.
+Byte-equality claims apply to identical *documents*; any edit-equality
+comparison must ignore the two provenance fields.
 
 ### 2.3 Reading (readers)
 
@@ -85,15 +94,67 @@ exactly (e.g. `"AsShot"`, `"JpegXl"`, `"chromatic_aberration"`).
 
 ## 3. Versioning policy
 
+### 3.1 The two versions
+
 Two independent version numbers appear in every document:
 
 - **`schema_version`** — the version of *this file format*. Current: **1**.
 - **`pipeline_version`** — the version of the *processing algorithms* the
-  edit was made with (`focale_core::PIPELINE_VERSION` at creation / last
-  edit). Exports must render with that version's algorithms forever.
+  edit was made with (`focale_core::PIPELINE_VERSION` at creation, or the
+  version the user last explicitly upgraded the document to, §3.3).
+  Exports must render with that version's algorithms forever.
 
-Rules (permanent compatibility, PRD §2/§6 — no exceptions, no
-deprecation):
+### 3.2 How pipeline permanence is enforced
+
+The guarantee "old sidecars render identically forever" is not a
+convention readers are asked to follow — it is mechanized in the
+reference implementation, and third-party implementations should mirror
+the same structure:
+
+- **A single dispatch point.** `focale_core::pipeline::render(input,
+  version)` is the only place a pipeline version is ever selected. It
+  matches on the number and fails with an "unsupported pipeline version"
+  error for any version the build does not implement — future versions
+  are never guessed at, mirroring the future-schema rule (§3.4).
+- **Frozen per-version module trees of pipe-filter stages.** Each
+  version is a module tree (`pipeline::v1`, …) of pure stage functions —
+  `v1::tone::apply(image, &params)`, `v1::geometry::apply(…)`, and so on
+  for every stage. Each stage is an encapsulated filter over
+  `(image, params)` with no shared pipeline state; constants, iteration
+  orders, kernels, and interpolation are pinned. Once a version ships,
+  output-changing edits to its tree are forbidden — even bug fixes: a
+  fix that changes output becomes part of the *next* version.
+- **How a new version is added while old ones stay re-runnable.** A `v2`
+  gets its own `render` entry and new stage modules **only for the
+  stages whose output changes**; for every unchanged stage, `v2::render`
+  calls the existing `v1` stage function directly. Because stages are
+  pure functions, this reuse cannot drift. Even when v2 changes a
+  stage's defaults or semantics, a document stamped `pipeline_version: 1`
+  still flows through `v1::render` via the dispatcher — every old
+  stage remains re-runnable exactly as shipped, regardless of what the
+  new version's defaults are. The dispatcher gains exactly one arm per
+  version; nothing else changes.
+- **Rendering always uses the stored version.** The GUI (preview, edit,
+  export) and the CLI both dispatch on the document's `pipeline_version`
+  — never silently on the build's current version.
+
+### 3.3 Older versions in the UI: warning and explicit upgrade
+
+- Opening a document whose `pipeline_version` is older than the build's
+  current version produces a persistent status-bar warning
+  ("edited with older pipeline vN"), emitted by the render dispatcher as
+  a render warning. Rendering continues with vN's algorithms.
+- The status bar offers an explicit **"Upgrade to v{current}"** action
+  that re-stamps `pipeline_version`; the edit is then reinterpreted
+  under the current algorithms. This is the **only** operation that ever
+  changes a document's `pipeline_version` — editing never re-stamps.
+- A `pipeline_version` *newer* than the build (possible within an
+  accepted `schema_version`) is not a load error; rendering fails with a
+  clear "unsupported pipeline version" message instead of guessing.
+
+### 3.4 Schema evolution rules
+
+Rules (permanent compatibility — no exceptions, no deprecation):
 
 - **Newer software reads every older schema forever.** Schema readers keep
   support for all versions `1..=current`.
@@ -137,6 +198,13 @@ Top-level value: tag 55799 around a map — `SidecarDoc`.
 | `edit` | `EditState` | all-default | Full parameter set for every stage (§5.2). |
 | `live_index` | `LiveIndex` | all-default | Directory-view index block (§5.13). |
 | `export_recipes` | array of `ExportRecipe` | `[]` | Named export configurations (§5.14). |
+| `focale_version` | String or null | null | Debug provenance: the Focale build that last wrote this file, `"<release>+<short-git-hash>"` (e.g. `"0.1.0+e258182"`; the hash segment is `"unknown"` when built outside git). null = written by a pre-provenance build. |
+| `focale_platform` | String or null | null | Debug provenance: OS the writer ran on — `"linux"`, `"macos"`, or `"windows"` (Rust `std::env::consts::OS` names). Same rules as `focale_version`. |
+
+The two `focale_*` fields exist solely for debugging field reports. The
+writing application re-stamps both on **every save**; readers MUST NOT
+branch on them, and they are excluded from all determinism/equality
+claims (§2.2 carve-out).
 
 ### 5.2 `EditState`
 
@@ -432,3 +500,6 @@ document.
 6. Decode byte-string fields (`deflate_bitmap`, `thumbnail_hash`) as CBOR
    major type 2; also accept integer arrays only if you choose to be
    liberal — Focale never writes them.
+7. Treat `focale_version` and `focale_platform` as opaque debug strings:
+   never parse them for behaviour. When writing, stamp your own writer
+   identification (or null) on every save.
