@@ -1340,6 +1340,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "focale-buildinfo"
+version = "0.1.0"
+
+[[package]]
 name = "focale-cli"
 version = "0.1.0"
 dependencies = [

@@ -385,6 +385,10 @@ fn canonical_doc() -> SidecarDoc {
         edit,
         live_index,
         export_recipes,
+        // Frozen literals, never derived from the running build — the
+        // fixture must be identical on every machine.
+        focale_version: Some("0.1.0+e258182".into()),
+        focale_platform: Some("linux".into()),
     }
 }
 

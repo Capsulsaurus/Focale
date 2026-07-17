@@ -59,6 +59,17 @@ pub struct SidecarDoc {
     /// Named export recipes. Each is complete and explicit so re-running it
     /// reproduces the exported bytes.
     pub export_recipes: Vec<ExportRecipe>,
+    /// Debug provenance: the Focale build that last wrote this document,
+    /// `"<release>+<short git hash>"` (e.g. `"0.1.0+e258182"`, hash
+    /// `"unknown"` when built outside git). `None` = written by a
+    /// pre-provenance build. Re-stamped on every save; readers MUST NOT
+    /// branch on it, and it is excluded from the "identical edits →
+    /// identical bytes" claim (docs/sidecar-schema.md §2.2).
+    pub focale_version: Option<String>,
+    /// Debug provenance: OS the writer ran on (`"linux"` / `"macos"` /
+    /// `"windows"`, from [`std::env::consts::OS`]). Same rules as
+    /// [`Self::focale_version`].
+    pub focale_platform: Option<String>,
 }
 
 impl Default for SidecarDoc {
@@ -78,7 +89,17 @@ impl SidecarDoc {
             edit: EditState::default(),
             live_index: LiveIndex::default(),
             export_recipes: Vec::new(),
+            focale_version: None,
+            focale_platform: None,
         }
+    }
+
+    /// Stamps writer provenance (build version string + platform).
+    /// Applications call this immediately before every save; the fields
+    /// exist solely for debugging and have no other purpose.
+    pub fn set_provenance(&mut self, version: &str, platform: &str) {
+        self.focale_version = Some(version.to_string());
+        self.focale_platform = Some(platform.to_string());
     }
 
     /// Serializes to the on-disk byte form: the document wrapped in CBOR
@@ -419,5 +440,45 @@ mod tests {
         );
         let back = SidecarDoc::load_from_bytes(&bytes).unwrap();
         assert_eq!(back, doc);
+    }
+
+    #[test]
+    fn default_doc_has_unknown_provenance() {
+        let doc = SidecarDoc::default();
+        assert_eq!(doc.focale_version, None);
+        assert_eq!(doc.focale_platform, None);
+    }
+
+    #[test]
+    fn set_provenance_round_trips() {
+        let mut doc = SidecarDoc::default();
+        doc.set_provenance("0.1.0+e258182", "linux");
+        let back = SidecarDoc::load_from_bytes(&doc.save_to_bytes().unwrap()).unwrap();
+        assert_eq!(back.focale_version.as_deref(), Some("0.1.0+e258182"));
+        assert_eq!(back.focale_platform.as_deref(), Some("linux"));
+    }
+
+    #[test]
+    fn missing_provenance_keys_default_to_none() {
+        // Simulate a document written by a pre-provenance build: strip the
+        // two keys from the encoded map and reload.
+        let mut doc = SidecarDoc::default();
+        doc.set_provenance("0.1.0+e258182", "linux");
+        let tree = Value::serialized(&doc).unwrap();
+        let Value::Map(entries) = tree else {
+            panic!("document must encode as a map");
+        };
+        let entries: Vec<_> = entries
+            .into_iter()
+            .filter(|(k, _)| {
+                k.as_text()
+                    .is_none_or(|t| t != "focale_version" && t != "focale_platform")
+            })
+            .collect();
+        let mut bytes = Vec::new();
+        cde::write_value(&mut bytes, &Value::Map(entries)).unwrap();
+        let back = SidecarDoc::load_from_bytes(&bytes).unwrap();
+        assert_eq!(back.focale_version, None);
+        assert_eq!(back.focale_platform, None);
     }
 }

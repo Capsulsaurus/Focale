@@ -10,6 +10,7 @@ repository = "https://github.com/Capsulsaurus/Focale"
 rust-version = "1.90"
 
 [workspace.dependencies]
+focale-buildinfo = { path = "crates/focale-buildinfo" }
 focale-core = { path = "crates/focale-core" }
 focale-export = { path = "crates/focale-export" }
 focale-segment = { path = "crates/focale-segment" }
