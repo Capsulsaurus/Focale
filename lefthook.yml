@@ -3,6 +3,10 @@
 commit-msg:
   commands:
     conventional-commit:
+      # Merge commits are exempt (see CLAUDE.md); skip while git is mid-merge/rebase.
+      skip:
+        - merge
+        - rebase
       run: convco check --from-stdin < {1}
 
 pre-commit:
