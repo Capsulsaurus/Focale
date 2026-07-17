@@ -1,6 +1,6 @@
 //! Pipeline v1 stage 10: finishing — post-crop vignette, then grain.
 //!
-//! **Frozen v1 algorithm** (PRD §2.2). The vignette is applied first and
+//! **Frozen v1 algorithm** (HARD-VER). The vignette is applied first and
 //! the grain second, so grain texture is not modulated by the vignette
 //! falloff (it rides on the vignetted luminance instead).
 //!

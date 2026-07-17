@@ -2,7 +2,7 @@
 //!
 //! One pool owns every non-UI computation. Jobs carry a priority; the UI
 //! thread submits work and polls results each frame. Priorities implement
-//! the PRD §7 contract: interactive preview beats thumbnails beats exports,
+//! the architecture.md §11 contract: interactive preview beats thumbnails beats exports,
 //! and AI-suggestion work runs only when everything else for the opened
 //! file is idle (the v1 suggestion engine is a stub, but its scheduling is
 //! wired now).
@@ -12,7 +12,7 @@ use std::collections::BinaryHeap;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering as AtomicOrdering};
 use std::sync::{Arc, Condvar, Mutex};
 
-/// Job classes, highest urgency first (PRD §7 + docs/architecture.md §9).
+/// Job classes, highest urgency first (architecture.md §11 + docs/architecture.md §10).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Priority {
     /// Slider-to-screen preview updates.

@@ -1,7 +1,7 @@
 // Focale viewport shader: working-space (linear Rec.2020) → display.
 //
 // Mirrors the CPU export pathway (focale-core color module) so the preview
-// is perceptually faithful to the export (PRD §2.1, §5):
+// is perceptually faithful to the export (HARD-DET; architecture.md §8):
 //   1. extended Reinhard tone map on max-RGB (white point uniform)
 //   2. gamut map into the active rendering gamut: fast path if in gamut,
 //      else hue-preserving Oklab chroma compression, 20 fixed bisections

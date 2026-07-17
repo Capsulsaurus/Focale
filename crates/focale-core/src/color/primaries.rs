@@ -20,7 +20,7 @@ use super::matrix::Mat3;
 
 /// A colour gamut selectable as a rendering or export target.
 ///
-/// The pipeline working space is linear Rec.2020 (docs/architecture.md §5);
+/// The pipeline working space is linear Rec.2020 (docs/architecture.md §3);
 /// the other gamuts are display/export targets.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
 pub enum Gamut {

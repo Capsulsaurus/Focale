@@ -1,4 +1,4 @@
-//! Deterministic export encoders for Focale (docs/architecture.md §7).
+//! Deterministic export encoders for Focale (docs/architecture.md §10).
 //!
 //! [`encode`] executes an [`ExportRecipe`] against a rendered working-space
 //! image (linear Rec.2020, f32, unbounded — the output of the processing

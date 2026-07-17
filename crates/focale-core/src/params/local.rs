@@ -18,7 +18,7 @@ pub struct LocalAdjustment {
     pub adjustments: LocalParams,
 }
 
-/// The subset of global tone/colour parameters available locally (PRD §3.6:
+/// The subset of global tone/colour parameters available locally (architecture.md §3 stage 6:
 /// "any subset of stages 4–5 parameters applied through masks").
 ///
 /// All values are deltas/offsets with 0 = no change, so an empty adjustment

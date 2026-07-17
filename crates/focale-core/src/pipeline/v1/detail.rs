@@ -1,6 +1,6 @@
 //! Pipeline v1 stage 7: detail — noise reduction and capture sharpening.
 //!
-//! **Frozen v1 algorithm** (PRD §2.2): every constant, kernel shape, and
+//! **Frozen v1 algorithm** (HARD-VER): every constant, kernel shape, and
 //! iteration order in this module is pinned; changing any output requires a
 //! new pipeline version.
 //!

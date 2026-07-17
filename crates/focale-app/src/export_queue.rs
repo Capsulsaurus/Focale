@@ -1,4 +1,4 @@
-//! Background export queue (PRD §7 batch).
+//! Background export queue (architecture.md §11 batch).
 
 use std::path::PathBuf;
 

@@ -2,7 +2,7 @@
 
 This document specifies the Focale sidecar file format precisely enough to
 implement an independent reader or writer. It is the published schema
-required by PRD §6. The reference implementation is
+required by architecture.md §7. The reference implementation is
 `crates/focale-sidecar` (`schema.rs` for the document tree, `cde.rs` for the
 encoder); the byte-level contract is frozen by the golden test fixture
 `crates/focale-sidecar/tests/golden/canonical.fcl`.
@@ -208,7 +208,7 @@ claims (§2.2 carve-out).
 
 ### 5.2 `EditState`
 
-Field order below mirrors the fixed pipeline stage order (PRD §3). Raw
+Field order below mirrors the fixed pipeline stage order (architecture.md §3). Raw
 decode (stage 1) has no user parameters; the output transform (stage 11)
 is parameterized by the export recipe.
 
@@ -425,7 +425,7 @@ identical grain.
 ### 5.13 `LiveIndex`
 
 The directory view builds its entire index by scanning this block across
-sidecars — nothing else (PRD §6–7).
+sidecars — nothing else (architecture.md §11).
 
 | Key | Type | Default | Meaning |
 | --- | --- | --- | --- |

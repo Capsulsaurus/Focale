@@ -1,6 +1,6 @@
 //! Pipeline v1 stage 3: white balance and the camera → working-space
 //! transform — **frozen**: the formulas documented here define the v1 output
-//! forever (PRD §2.2).
+//! forever (HARD-VER).
 //!
 //! Converts linear camera-native RGB (stage 1 output) to the linear Rec.2020
 //! working space, white-balanced so that the selected scene neutral maps to

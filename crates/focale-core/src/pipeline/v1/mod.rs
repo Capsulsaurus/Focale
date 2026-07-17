@@ -2,9 +2,9 @@
 //!
 //! Every algorithm in this tree is pinned: constants, iteration orders,
 //! kernel shapes, interpolation methods. Bug fixes that change output are
-//! not allowed here; they become pipeline version 2 (PRD §2.2).
+//! not allowed here; they become pipeline version 2 (HARD-VER).
 //!
-//! Determinism contract (PRD §2.1): CPU-only, f32 with fixed expression
+//! Determinism contract (HARD-DET): CPU-only, f32 with fixed expression
 //! order, `rayon` only over disjoint rows, all whole-image statistics
 //! computed sequentially, no `HashMap` iteration on the pixel path.
 
@@ -21,7 +21,7 @@ pub mod white_balance;
 use crate::image::ImageRgbF32;
 use crate::pipeline::{RenderInput, RenderOutput, RenderWarning};
 
-/// Runs pipeline v1, stages 2–10, in the fixed PRD §3 order, producing the
+/// Runs pipeline v1, stages 2–10, in the fixed architecture.md §3 order, producing the
 /// working-space image (linear Rec.2020; geometry applied; ready for an
 /// output transform).
 pub fn render(input: &RenderInput<'_>) -> RenderOutput {
@@ -30,7 +30,7 @@ pub fn render(input: &RenderInput<'_>) -> RenderOutput {
     let edit = input.edit;
 
     // Stage 2: optical corrections. v1 decode exposes no optics metadata
-    // (docs/architecture.md §4): warn and skip — never guess, never fail.
+    // (docs/architecture.md §5): warn and skip — never guess, never fail.
     if edit.optics.enabled
         && !(meta.optics.vignetting || meta.optics.chromatic_aberration || meta.optics.distortion)
     {

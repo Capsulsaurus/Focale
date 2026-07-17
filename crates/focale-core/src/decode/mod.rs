@@ -1,5 +1,5 @@
 //! Stage 1: raw decode — rawshift-backed ARW/DNG decoding to linear camera
-//! RGB f32 (docs/architecture.md §3, PRD §3 stage 1).
+//! RGB f32 (docs/architecture.md §4, architecture.md §3 stage 1).
 //!
 //! # Pixel pipeline
 //!
@@ -49,14 +49,14 @@
 //! [`DecodeError::UnsupportedCompression`]; pre-demosaiced "LinearRaw" DNG
 //! (e.g. Apple ProRAW) as [`DecodeError::UnsupportedFormat`].
 //!
-//! # Optics correction metadata (architecture.md §4)
+//! # Optics correction metadata (architecture.md §5)
 //!
-//! PRD §3 stage 2 sources optical corrections exclusively from embedded
+//! architecture.md §3 stage 2 sources optical corrections exclusively from embedded
 //! metadata. rawshift 0.1.1 parses **no** optics metadata from ARW (Sony
 //! stores it in undecoded MakerNote tags) and applies DNG `GainMap` opcodes
 //! only on its internal LinearRaw path, which we do not use. Consequently
 //! [`OpticsMetadata`] reports all sources absent (`false`) in v1, and the
-//! optics stage emits its PRD-mandated "no optics metadata; stage skipped"
+//! optics stage emits its mandated (architecture.md §5) "no optics metadata; stage skipped"
 //! warning. The struct exists so presence is reported honestly per file the
 //! moment upstream parsing lands.
 //!
@@ -143,7 +143,7 @@ pub struct RawMetadata {
     pub focal_length: Option<f32>,
     /// Lens model name.
     pub lens_model: Option<String>,
-    /// Which optics-correction sources are present (PRD §3 stage 2).
+    /// Which optics-correction sources are present (architecture.md §3 stage 2).
     pub optics: OpticsMetadata,
 }
 
@@ -166,7 +166,7 @@ pub struct OpticsMetadata {
 /// Errors surfaced by the decode stage.
 ///
 /// Per-file and typed so the UI can report precisely why a file cannot be
-/// opened (PRD: "we surface a clear per-file error").
+/// opened (architecture.md §4: "we surface a clear per-file error").
 #[derive(Debug, Error)]
 pub enum DecodeError {
     /// The container was recognized but its pixel data uses a compression

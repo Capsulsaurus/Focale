@@ -1,4 +1,4 @@
-//! The `.fcl` sidecar document schema (PRD §6).
+//! The `.fcl` sidecar document schema (architecture.md §7).
 //!
 //! One [`SidecarDoc`] per image, holding everything needed to reproduce an
 //! export bit-identically forever: schema + pipeline versions, the full
@@ -54,7 +54,7 @@ pub struct SidecarDoc {
     /// retouch strokes.
     pub edit: EditState,
     /// Metadata block sufficient for the directory view to build its index
-    /// by scanning sidecars alone (PRD §6–7).
+    /// by scanning sidecars alone (architecture.md §11).
     pub live_index: LiveIndex,
     /// Named export recipes. Each is complete and explicit so re-running it
     /// reproduces the exported bytes.
@@ -169,7 +169,7 @@ impl SidecarDoc {
     }
 }
 
-/// Culling/index metadata (PRD §6): the directory view builds its entire
+/// Culling/index metadata (architecture.md §7): the directory view builds its entire
 /// index from this block alone — file names and directory shape carry no
 /// meaning.
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
@@ -219,7 +219,7 @@ pub struct ExportRecipe {
     pub resize: Option<ResizeSpec>,
 }
 
-/// Output format and its encoder options (PRD §8 codec list). Every
+/// Output format and its encoder options (architecture.md §9 codec list). Every
 /// format-specific knob that affects output bytes lives here.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum ExportFormat {
@@ -299,7 +299,7 @@ pub enum ExportGamut {
     Rec2020,
 }
 
-/// HDR output options (PRD §5: full capability of each format).
+/// HDR output options (architecture.md §9: full capability of each format).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct HdrOptions {
@@ -308,7 +308,7 @@ pub struct HdrOptions {
     /// Mastering peak luminance in cd/m² (nits).
     pub peak_nits: f32,
     /// Gain-map generation. A seam only in v1: recipes may carry the block
-    /// but execution rejects it (docs/architecture.md §7).
+    /// but execution rejects it (docs/architecture.md §10).
     pub gain_map: Option<GainMapOptions>,
 }
 

@@ -80,7 +80,7 @@ pub struct FocaleApp {
     thumbs: HashMap<PathBuf, TextureHandle>,
     thumbs_requested: HashSet<PathBuf>,
 
-    /// Active rendering gamut (status-bar key, PRD §5).
+    /// Active rendering gamut (status-bar key, architecture.md §8).
     gamut: Gamut,
     tool: Tool,
     /// Zoom: None = fit to window; Some(z) = z× (1.0 = 100%).
@@ -98,11 +98,11 @@ pub struct FocaleApp {
 
     exports: Vec<ExportItem>,
     selected_recipe: usize,
-    /// Copied settings buffer (batch paste, PRD §7).
+    /// Copied settings buffer (batch paste, architecture.md §11).
     clipboard: Option<EditState>,
     suggestions: SuggestionSet,
     suggest_pending: Option<JobHandle>,
-    /// Local ONNX segmentation (PRD §4); models load lazily from the user
+    /// Local ONNX segmentation (architecture.md §6); models load lazily from the user
     /// data dir. `None` until first use.
     segmenter: std::sync::Arc<std::sync::Mutex<focale_segment::Segmenter>>,
     segmenting: bool,
@@ -272,7 +272,7 @@ impl FocaleApp {
     }
 
     /// Applies the primary image's edit to all selected sidecars (batch
-    /// broadcast, PRD §7) and schedules preview + save.
+    /// broadcast, architecture.md §11) and schedules preview + save.
     fn after_edit_change(&mut self) {
         let Some(primary) = self.primary_path() else {
             return;
@@ -593,7 +593,7 @@ impl eframe::App for FocaleApp {
             });
         });
 
-        // ---- Status bar (PRD §7 HARD: persistent keyed fields) ----
+        // ---- Status bar (architecture.md §11 HARD: persistent keyed fields) ----
         egui::Panel::bottom("status").show(root, |ui| {
             ui.horizontal(|ui| {
                 ui.label(RichText::new(format!("Gamut: {}", self.gamut.display_name())).strong());
@@ -740,7 +740,7 @@ impl eframe::App for FocaleApp {
                         }
                     }
                     ui.separator();
-                    // Batch copy/paste (PRD §7).
+                    // Batch copy/paste (architecture.md §11).
                     ui.horizontal(|ui| {
                         if ui.button("Copy settings").clicked() {
                             self.clipboard = Some(self.doc_mut(&path).edit.clone());

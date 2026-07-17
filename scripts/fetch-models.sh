@@ -1,7 +1,7 @@
 #!/bin/sh
 # fetch-models.sh — download the AI segmentation models Focale uses.
 #
-# Focale itself makes NO network calls (PRD §2.3, local-only). This script is
+# Focale itself makes NO network calls (HARD-LOCAL). This script is
 # the one sanctioned download path: run it once, by hand, and the app loads
 # the models from the user data directory forever after. Every URL is pinned
 # and verified against a sha256 recorded below.

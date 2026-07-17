@@ -1,7 +1,7 @@
 //! The working image buffer: interleaved RGB f32.
 //!
 //! This is the only pixel container on the processing path. Working space is
-//! linear Rec.2020, f32, unbounded (PRD §3) — but the container itself is
+//! linear Rec.2020, f32, unbounded (architecture.md §3) — but the container itself is
 //! space-agnostic; stages document what they expect.
 
 /// Interleaved RGB f32 image, row-major.
@@ -92,7 +92,7 @@ impl ImageRgbF32 {
 
     /// Iterates over rows mutably — the building block for deterministic
     /// parallelism: disjoint rows may be processed on any thread because
-    /// each output value depends only on its own input (PRD §2.1).
+    /// each output value depends only on its own input (HARD-DET).
     pub fn rows_mut(&mut self) -> std::slice::ChunksMut<'_, f32> {
         self.data.chunks_mut(self.width as usize * 3)
     }

@@ -1,7 +1,7 @@
 //! Pipeline v1 stage 9: geometry — EXIF orientation, rotate, perspective,
 //! flip, crop.
 //!
-//! **Frozen v1 geometry model** (PRD §2.2). The stage applies, in this
+//! **Frozen v1 geometry model** (HARD-VER). The stage applies, in this
 //! fixed order:
 //!
 //! 1. **EXIF orientation** (values 1–8): exact pixel shuffling

@@ -2,7 +2,7 @@
 //!
 //! These types are the canonical edit state: the sidecar serializes them, the
 //! UI edits them, and both the CPU export path and the GPU preview consume
-//! them. Stage order is fixed (PRD §3); stages can only be enabled/disabled
+//! them. Stage order is fixed (architecture.md §3); stages can only be enabled/disabled
 //! and parameterized.
 //!
 //! All fields are plain data with serde derives. Numeric ranges are
@@ -33,7 +33,7 @@ use serde::{Deserialize, Serialize};
 
 /// The complete, ordered edit state for one image.
 ///
-/// Field order mirrors the fixed pipeline stage order (PRD §3). Raw decode
+/// Field order mirrors the fixed pipeline stage order (architecture.md §3). Raw decode
 /// has no user parameters and the output transform's parameters live in the
 /// export recipe, so neither appears here.
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]

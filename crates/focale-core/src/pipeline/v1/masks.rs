@@ -1,8 +1,8 @@
-//! Mask rasterization for pipeline v1 (PRD §4, docs/architecture.md §6) —
+//! Mask rasterization for pipeline v1 (architecture.md §6, docs/architecture.md §6) —
 //! **frozen**: the formulas documented here define the v1 output forever.
 //!
 //! A [`MaskGroup`] rasterizes to a single-channel coverage plane in `[0, 1]`
-//! at the context dimensions. Determinism contract (PRD §2.1): all pixel
+//! at the context dimensions. Determinism contract (HARD-DET): all pixel
 //! maths is `f32` with fixed expression order, iteration orders are fixed,
 //! and `rayon` is used only over disjoint output rows (each output value
 //! depends solely on its inputs, so thread count cannot change results).

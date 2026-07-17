@@ -86,7 +86,7 @@ validates the message is a conventional commit; pre-push runs the full CI check 
 GitHub Actions runs format checks, clippy, tests on pushes to `master` and pull
 requests, plus conventional-commit validation on pull requests. A separate
 Determinism workflow renders the committed (raw + sidecar) fixture on x86_64 and
-aarch64 in every export format and fails if any byte differs (PRD §10).
+aarch64 in every export format and fails if any byte differs (architecture.md §13).
 
 ## Releases & Changelog
 

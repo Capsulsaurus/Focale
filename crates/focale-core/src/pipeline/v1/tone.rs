@@ -1,5 +1,5 @@
 //! Pipeline v1 stage 4: global tone — **frozen**: the formulas documented
-//! here define the v1 output forever (PRD §2.2).
+//! here define the v1 output forever (HARD-VER).
 //!
 //! # Operating principle: luminance-ratio preservation
 //!

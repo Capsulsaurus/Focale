@@ -1,8 +1,8 @@
 //! Pipeline v1 stage 8: retouch — clone and heal stamps.
 //!
-//! **Frozen v1 algorithm** (PRD §2.2). Heal is a *mean-matched clone*
+//! **Frozen v1 algorithm** (HARD-VER). Heal is a *mean-matched clone*
 //! (per-channel destination/source mean ratio), not a Poisson blend —
-//! content-aware retouch is out of scope for v1 (PRD §3.8).
+//! content-aware retouch is out of scope for v1 (architecture.md §3 stage 8).
 //!
 //! # Determinism
 //!

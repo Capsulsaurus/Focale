@@ -1,9 +1,9 @@
-//! The fixed processing pipeline (PRD §3).
+//! The fixed processing pipeline (architecture.md §3).
 //!
 //! Stage order is permanent and identical for preview and export. Algorithms
 //! are grouped by pipeline version: `v1` is frozen at release; changing any
 //! algorithm's output requires adding a `v2` module while `v1` remains
-//! byte-stable forever (PRD §2.2). The dispatcher below is the only place
+//! byte-stable forever (HARD-VER). The dispatcher below is the only place
 //! that selects a version.
 
 pub mod v1;
@@ -22,7 +22,7 @@ pub struct RenderInput<'a> {
     /// Ratio of `decoded`'s resolution to the native raw resolution
     /// (1.0 = full-resolution export). Stages multiply pixel-dimensioned
     /// parameters (blur radii, grain size, …) by this so previews stay
-    /// perceptually faithful to the export (PRD §2.1).
+    /// perceptually faithful to the export (HARD-DET).
     pub scale: f32,
 }
 
@@ -32,7 +32,7 @@ pub struct RenderInput<'a> {
 pub struct RenderOutput {
     /// The rendered working-space image.
     pub image: ImageRgbF32,
-    /// Non-fatal conditions the UI must surface (PRD §3.2, §7).
+    /// Non-fatal conditions the UI must surface (architecture.md §5, §11).
     pub warnings: Vec<RenderWarning>,
 }
 
@@ -40,7 +40,7 @@ pub struct RenderOutput {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RenderWarning {
     /// The raw file carries no optics-correction metadata; the optics stage
-    /// was skipped (PRD §3.2: warn, never guess, never fail).
+    /// was skipped (architecture.md §5: warn, never guess, never fail).
     OpticsMetadataMissing,
     /// The camera model has no colour calibration; a generic matrix was used.
     CameraMatrixMissing,

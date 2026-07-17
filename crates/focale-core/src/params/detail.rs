@@ -1,7 +1,7 @@
 //! Stage 7: detail — capture sharpening and conventional noise reduction.
 //!
 //! Non-neural in v1; neural replacements arrive as new pipeline-versioned
-//! stages (PRD §3.7).
+//! stages (architecture.md §3 stage 7).
 
 use serde::{Deserialize, Serialize};
 

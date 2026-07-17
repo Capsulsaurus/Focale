@@ -1,5 +1,5 @@
 //! Pipeline v1 stage 5: global colour — **frozen**: the formulas documented
-//! here define the v1 output forever (PRD §2.2).
+//! here define the v1 output forever (HARD-VER).
 //!
 //! Works per pixel in Oklab/Oklch derived from the linear Rec.2020 working
 //! space: `rec2020 → XYZ → Oklab` ([`crate::color`]), adjustments applied,

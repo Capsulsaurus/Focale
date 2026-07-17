@@ -7,7 +7,7 @@
 //!
 //! # Colour handling
 //!
-//! The working image is linear Rec.2020 (PRD §3). Every model in this crate
+//! The working image is linear Rec.2020 (architecture.md §3). Every model in this crate
 //! was trained on sRGB-encoded photographs, so preprocessing converts:
 //! resize in linear light first (bilinear, pixel-centre convention), then
 //! per pixel `Rec.2020 → sRGB` via [`REC2020_TO_SRGB`] and the IEC 61966-2-1

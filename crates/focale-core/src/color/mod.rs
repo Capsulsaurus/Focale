@@ -1,5 +1,5 @@
 //! Colour science: primaries, transfer functions, chromatic adaptation,
-//! Oklab, gamut mapping, HDR tone mapping (docs/architecture.md §7).
+//! Oklab, gamut mapping, HDR tone mapping (docs/architecture.md §10).
 //!
 //! Everything here runs on the deterministic export path: pixel maths is
 //! `f32` with fixed expression order (Rust enables no fast-math or FMA
@@ -11,7 +11,7 @@
 //! export.
 //!
 //! A soft-proofing transform will slot in between the working image and the
-//! display transform post-v1 (PRD §5); nothing here assumes the working →
+//! display transform post-v1 (architecture.md §8); nothing here assumes the working →
 //! display conversion is a single step.
 //!
 //! # Transcendentals
@@ -20,7 +20,7 @@
 //! through [`crate::math`], which wraps the pure-Rust `libm` crate: platform
 //! maths libraries differ across libc versions (a glibc 2.39 vs 2.42
 //! divergence was caught by the regression golden), so the export path
-//! never calls them. The determinism CI matrix (docs/architecture.md §11)
+//! never calls them. The determinism CI matrix (docs/architecture.md §13)
 //! guards this.
 
 pub mod adapt;

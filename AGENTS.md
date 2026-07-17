@@ -1,10 +1,11 @@
 # Focale
 
 Deterministic, guided raw photo developer. Rust workspace; GUI is winit + wgpu + egui.
-The product spec is `docs/prd.md`; every delegated design decision is recorded in
-`docs/architecture.md`. Read both before changing processing code.
+`docs/architecture.md` is the canonical spec: product requirements (HARD IDs like
+`HARD-DET`) and every design decision with rationale. The sidecar file format is
+specified in `docs/sidecar-schema.md`. Read both before changing processing code.
 
-## Invariants (from the PRD — never violate)
+## Invariants (architecture.md §1 — never violate)
 
 - **Determinism:** the export path is CPU-only and bit-identical across machines and
   architectures. No `fast-math`, no non-deterministic parallel reductions, fixed

@@ -1,6 +1,6 @@
 //! Preview rendering: decode caching, downscaling, pipeline runs.
 //!
-//! Strategy (docs/architecture.md §8): decode once per image, immediately
+//! Strategy (docs/architecture.md §10): decode once per image, immediately
 //! box-downscale to a preview base (long edge ≤ [`PREVIEW_LONG_EDGE`]) and
 //! drop the full-resolution buffer; every slider change re-runs the CPU
 //! pipeline on the preview base (stage caching arrives with profiling data;

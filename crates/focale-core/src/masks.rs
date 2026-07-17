@@ -1,4 +1,4 @@
-//! Mask model (PRD §4).
+//! Mask model (architecture.md §6).
 //!
 //! Masks are stored parametrically in the sidecar and rasterized
 //! deterministically on the CPU (`pipeline::v1::masks`). AI-segmented masks
@@ -35,7 +35,7 @@ pub struct MaskComponent {
     pub shape: MaskShape,
 }
 
-/// Combination operators (PRD §4: add / subtract / intersect).
+/// Combination operators (architecture.md §6: add / subtract / intersect).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum MaskOp {
     /// Union: `max(acc, m)`.
@@ -130,7 +130,7 @@ pub struct ColorRangeMask {
     pub falloff: f32,
 }
 
-/// An AI mask resolved to a coverage bitmap (PRD §4: models never run at
+/// An AI mask resolved to a coverage bitmap (architecture.md §6: models never run at
 /// export). Stored at reduced resolution and upsampled bilinearly.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ResolvedMask {
@@ -146,7 +146,7 @@ pub struct ResolvedMask {
     pub deflate_bitmap: Vec<u8>,
 }
 
-/// What an AI mask selected (PRD §4 parity list).
+/// What an AI mask selected (architecture.md §6 parity list).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum SegmentKind {
     /// Main subject.
@@ -171,7 +171,7 @@ pub enum SegmentKind {
     },
 }
 
-/// Per-person segmentation components (PRD §4).
+/// Per-person segmentation components (architecture.md §6).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PersonPart {
     /// Facial skin.

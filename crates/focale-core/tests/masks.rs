@@ -1,5 +1,5 @@
 //! Integration tests for the pipeline v1 mask rasterizer
-//! (`pipeline::v1::masks`) — the PRD §4 parity checklist backbone.
+//! (`pipeline::v1::masks`) — the architecture.md §6 parity checklist backbone.
 //!
 //! Geometry probes use normalized coordinates and the pixel-centre
 //! convention: pixel `(x, y)` samples `((x + 0.5)/w, (y + 0.5)/h)`.

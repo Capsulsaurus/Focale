@@ -1,4 +1,4 @@
-//! AI-suggestion hook (PRD §7): v1 ships the scheduling and UI affordance
+//! AI-suggestion hook (architecture.md §11): v1 ships the scheduling and UI affordance
 //! with a stub engine; the model arrives in v2.
 //!
 //! Contract implemented now: suggestions compute lazily once all other work

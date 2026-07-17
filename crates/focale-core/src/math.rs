@@ -5,7 +5,7 @@
 //! operating systems — the pipeline regression golden caught exactly such a
 //! divergence between glibc 2.39 and 2.42. Everything on the export path
 //! therefore uses these wrappers over the pure-Rust [`libm`] crate: the same
-//! bits on every machine, forever (PRD §2.1).
+//! bits on every machine, forever (HARD-DET).
 //!
 //! Pure IEEE 754 operations (`+ - * /`, `sqrt`, `floor`, `abs`, `mul_add`
 //! avoided) are correctly-rounded by the standard and stay on `std`.

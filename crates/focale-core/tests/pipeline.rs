@@ -1,6 +1,6 @@
 //! End-to-end pipeline v1 integration: decode the committed fixture, run a
 //! rich edit through every stage, and pin the output as a regression golden
-//! (PRD §10: pipeline-version regression suite).
+//! (architecture.md §13: pipeline-version regression suite).
 
 use focale_core::decode::decode_file;
 use focale_core::masks::*;
@@ -199,7 +199,7 @@ fn rich_edit_renders_deterministically() {
 }
 
 /// Frozen pipeline-v1 regression golden. If this hash ever changes, v1
-/// output changed — that is a PRD §2.2 violation unless the change is a new
+/// output changed — that is a HARD-VER violation unless the change is a new
 /// pipeline version. Bless intentionally-new goldens only before the first
 /// release, with FOCALE_BLESS=1.
 #[test]
@@ -214,5 +214,5 @@ fn rich_edit_matches_frozen_golden() {
     }
     let expected = std::fs::read_to_string(&golden_path)
         .expect("golden file present (generate once with FOCALE_BLESS=1)");
-    assert_eq!(line, expected, "pipeline v1 output changed — see PRD §2.2");
+    assert_eq!(line, expected, "pipeline v1 output changed — see HARD-VER");
 }

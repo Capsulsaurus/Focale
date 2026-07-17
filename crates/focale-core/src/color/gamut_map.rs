@@ -1,4 +1,4 @@
-//! Gamut mapping: pipeline v1 operator (docs/architecture.md §7).
+//! Gamut mapping: pipeline v1 operator (docs/architecture.md §10).
 //!
 //! # Operator definition (v1 — frozen)
 //!
