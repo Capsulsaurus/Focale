@@ -27,6 +27,19 @@ measurement kit + open profile database, neural denoise/sharpen.
 Success bar: 20 culled frames, finished in 30 minutes, indistinguishable from your
 current editor's output.
 
+## Support Matrix
+
+- Platforms: macOS (Apple Silicon), Windows (x86\_64, arm\_64), Linux (Wayland) (x86\_64, arm\_64)*
+- GPUs:
+  * macOS: Apple Silicon (i.e. no external GPUs)
+  * Windows: NVIDIA, AMD
+  * Linux: VA-API (includes AMD and Intel via mesa drivers)
+- Formats**: All common image formats and some RAW image formats are currently supported. We have explicit software support by specific devices. All support is done by an underlying open-source library called `rawshift`. The exact support is best referred to the comprehensive table: <https://github.com/justin13888/rawshift/tree/master/crates/rawshift-image#format-support>
+
+> Don't see the format or camera that you need? Open a GitHub [issue directly in this repo (and not upstream)](https://github.com/Capsulsaurus/Focale/issues/new/choose)
+
+*: Linux version strictly requires a reasonably recent version of Wayland and compositor with Wayland Color Management protocol
+
 ## Guiding Principles
 
 - Color representation: Mathematically model and expose images in physically faithful model.
@@ -54,8 +67,8 @@ Open a directory of raws (Sony lossless-compressed ARW or DNG in v1); cull with
 in the filmstrip to broadcast edits or use *Copy settings → Paste to selection*;
 export runs in a background queue (`focale-export/` beside your raws). Edits live in
 `<file>.<ext>.fcl` sidecars — raws are never modified, and identical sidecars render
-bit-identically on any machine, forever. See `docs/architecture.md` and
-`docs/sidecar-schema.md`.
+bit-identically on any machine, forever. See the docs index at `docs/README.md`
+(subsystem specs, glossary) and the sidecar format in `docs/subsystems/sidecar.md`.
 
 ## Prerequisites
 
@@ -86,7 +99,7 @@ validates the message is a conventional commit; pre-push runs the full CI check 
 GitHub Actions runs format checks, clippy, tests on pushes to `master` and pull
 requests, plus conventional-commit validation on pull requests. A separate
 Determinism workflow renders the committed (raw + sidecar) fixture on x86_64 and
-aarch64 in every export format and fails if any byte differs (architecture.md §13).
+aarch64 in every export format and fails if any byte differs (`docs/verification.md`).
 
 ## Releases & Changelog
 
