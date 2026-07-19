@@ -44,6 +44,14 @@ with a documented fit:
   `r_src = r·(k0 + k1·r² + k2·r⁴ + k3·r⁶)` about the optical centre.
 - **Lateral CA:** per-channel scale on the same radial polynomial (red and blue
   planes warp with their own coefficients relative to green).
+- **Sampled radial splines** as an alternate radial form for all three
+  corrections: Sony bodies store corrections as evenly-spaced radial spline
+  knots in reverse-engineered MakerNote tags (`0x7032` vignetting, `0x7035`
+  CA, `0x7037` distortion — decoded today by ExifTool/darktable/RawTherapee;
+  landscape in [rnd/lens-database.md](../rnd/lens-database.md)). Spline
+  evaluation with pinned interpolation is deterministic exactly like the
+  polynomial form; this is the expected shape of ARW embedded metadata once
+  rawshift exposes it.
 
 ## Application order & determinism (normative for issue #7)
 

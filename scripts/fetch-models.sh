@@ -9,7 +9,8 @@
 # Target directory: $XDG_DATA_HOME/focale/models (default
 # ~/.local/share/focale/models), matching focale_segment::ModelPaths.
 #
-# Models and licenses (all AGPL-compatible, verified 2026-07-11):
+# Models and licenses (summary; the full compliance analysis, including
+# dataset-terms caveats, is docs/rnd/ml-models.md — the source of truth):
 #
 #   mobile_sam_image_encoder.onnx / sam_mask_decoder_single.onnx
 #     MobileSAM (https://github.com/ChaoningZhang/MobileSAM), Apache-2.0.
