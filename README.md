@@ -10,7 +10,7 @@ era. One-click tools trade away the decisions; Darktable is free but its depth i
 obstacle. Nothing serves the photographer with a trained eye who wants deliverable
 results quickly, without babysitting fifty sliders per frame.
 
-**[Name] is an AGPL raw developer built for speed with intent.** One correctness-ordered
+**Focale is an AGPL raw developer built for speed with intent.** One correctness-ordered
 pipeline, stripped of redundant controls: optics, then colour-managed development, then
 finishing. Creative range lives in masks — geometric and AI-segmented, at parity with
 the tools you're leaving — not in panel sprawl. Every edit is deterministic: the
@@ -40,13 +40,15 @@ current editor's output.
 
 *: Linux version strictly requires a reasonably recent version of Wayland and compositor with Wayland Color Management protocol
 
-## Guiding Principles
+## Development
+
+### Guiding Principles
 
 - Color representation: Mathematically model and expose images in physically faithful model.
 - Offer tools to extend photos with creative freedom
 - User-driven design: Everything you see feels like you can touch it. Responsive. Interactive. Intuitive.
 
-## Implementation Guidelines
+### Implementation Guidelines
 
 - Lean on open-source dependencies where possible and hand-roll for things missing. The upcoming `gamut` ecosystem should be able to handle majority of complexities in codebase.
 - UI is designed to be consistent with common applications. No user guide should be necessary to explain any new feature.
@@ -54,7 +56,7 @@ current editor's output.
 - Use Rust where possible for its memory guarantees and modern toolchain. Drop to C/C++ for native APIs if strictly necessary. Compile with LLVM for all targets.
 - Subsystems clearly define ownership of logic.
 
-## Getting Started
+### Getting Started
 
 ```bash
 just run                     # launch the desktop app (Wayland/X11)
@@ -70,7 +72,7 @@ export runs in a background queue (`focale-export/` beside your raws). Edits liv
 bit-identically on any machine, forever. See the docs index at `docs/README.md`
 (subsystem specs, glossary) and the sidecar format in `docs/subsystems/sidecar.md`.
 
-## Prerequisites
+### Prerequisites
 
 - [Rust (rustup)](https://rustup.rs) — toolchain (pinned via `rust-toolchain.toml`)
 - [just](https://github.com/casey/just) — command runner
@@ -78,7 +80,7 @@ bit-identically on any machine, forever. See the docs index at `docs/README.md`
 - [convco](https://github.com/convco/convco) — conventional-commit checker used by hooks
 - cmake + a C++ toolchain — builds the vendored libjxl for JPEG XL export
 
-## Development
+## Commands
 
 | Command      | Description                                  |
 | ------------ | -------------------------------------------- |
