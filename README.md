@@ -1,6 +1,8 @@
 # Focale
 
-Mathematically-guided RAW image processor.
+> Status (July 2026): Alpha and actively developed. Star here on GitHub and stay tuned!
+
+Mathematically-guided RAW image processor and editor.
 
 ## Why This Exists
 
@@ -39,6 +41,23 @@ current editor's output.
 > Don't see the format or camera that you need? Open a GitHub [issue directly in this repo (and not upstream)](https://github.com/Capsulsaurus/Focale/issues/new/choose)
 
 *: Linux version strictly requires a reasonably recent version of Wayland and compositor with Wayland Color Management protocol
+
+## FAQ
+
+**Q: Focale's workflow and capabilities do not cover what I need.**
+A: If you have specific critique or suggestions, please feel free to submit issue for specific feature requests or open a conversation to discuss potential resolutions. We aim to rapidly address community needs although we may push back if there are technical reasons.
+
+**Q: Why should I use Focale over <insert your existing editor here>**
+A (from creator): There can be many reasons but my biggest reason is that none of the proprietary software I have ever creates edits remains replicable in 10+ years and across all devices. We are aiming to be the best open RAW image processor/editor suitable for (most) professional use.
+
+**Q: If it were so capable, why is it free?**
+A: It was created out of need and not as some company's core life blood. The power in a better product is that it is being used and adopted as a community.
+
+**Q: The decoded images look different from what I expected.**
+A: Assuming you have verified with another software, please file a bug report. It could be a device we did not test for.
+
+**Q: I want to use another tool in conjunction.**
+A: If you have another tool you need to further process your images, your best bet like other raw processors is to *export as TIFF* and continue. We do not plan to have a button along the lines "Open in <photo editor of choice>" as we do not endorse any company's paid products, each with quite different cataloguing ideologies.
 
 ## Development
 
