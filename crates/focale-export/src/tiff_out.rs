@@ -1,4 +1,4 @@
-//! 16-bit TIFF export — the designated hand-off format (architecture.md §12).
+//! 16-bit TIFF export — the designated hand-off format (docs/subsystems/export.md).
 //!
 //! Pinned decisions (v1):
 //!

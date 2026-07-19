@@ -1,4 +1,4 @@
-//! The colour-managed image viewport (architecture.md §8).
+//! The colour-managed image viewport (docs/subsystems/color.md).
 //!
 //! The image is drawn by our own wgpu render pass — never by egui's
 //! textured-mesh path — performing working-space → display conversion in
@@ -6,7 +6,7 @@
 //! pathway; all colour matrices are uploaded from `focale_core::color`
 //! constants so preview and export share one source of truth.
 //!
-//! v1 display assumption (docs/architecture.md §10): the surface is sRGB
+//! v1 display assumption (docs/subsystems/color.md): the surface is sRGB
 //! (user-set profile with sRGB default; a `wp_color_management_v1` query
 //! slots in here later). The *active rendering gamut* is user-selectable
 //! and shown in the status bar.

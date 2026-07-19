@@ -1,6 +1,6 @@
 name: Determinism
 
-# architecture.md §13: export the same (raw + sidecar) on two architectures and diff
+# docs/verification.md: export the same (raw + sidecar) on two architectures and diff
 # bytes. Runs the full workspace test suite (golden-file and regression
 # tests) on both, then byte-hashes focale-cli renders of the committed
 # fixture in every export format and compares across architectures.

@@ -1,4 +1,4 @@
-//! The fixed processing pipeline (architecture.md §3).
+//! The fixed processing pipeline (docs/subsystems/pipeline.md).
 //!
 //! Stage order is permanent and identical for preview and export. Algorithms
 //! are grouped by pipeline version: `v1` is frozen at release; changing any
@@ -32,7 +32,7 @@ pub struct RenderInput<'a> {
 pub struct RenderOutput {
     /// The rendered working-space image.
     pub image: ImageRgbF32,
-    /// Non-fatal conditions the UI must surface (architecture.md §5, §11).
+    /// Non-fatal conditions the UI must surface (docs/subsystems/optics.md, docs/subsystems/app.md).
     pub warnings: Vec<RenderWarning>,
 }
 
@@ -40,7 +40,7 @@ pub struct RenderOutput {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RenderWarning {
     /// The raw file carries no optics-correction metadata; the optics stage
-    /// was skipped (architecture.md §5: warn, never guess, never fail).
+    /// was skipped (docs/subsystems/optics.md: warn, never guess, never fail).
     OpticsMetadataMissing,
     /// The camera model has no colour calibration; a generic matrix was used.
     CameraMatrixMissing,

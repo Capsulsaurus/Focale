@@ -1,4 +1,4 @@
-//! The `.fcl` sidecar document schema (architecture.md §7).
+//! The `.fcl` sidecar document schema (docs/subsystems/sidecar.md).
 //!
 //! One [`SidecarDoc`] per image, holding everything needed to reproduce an
 //! export bit-identically forever: schema + pipeline versions, the full
@@ -54,7 +54,7 @@ pub struct SidecarDoc {
     /// retouch strokes.
     pub edit: EditState,
     /// Metadata block sufficient for the directory view to build its index
-    /// by scanning sidecars alone (architecture.md §11).
+    /// by scanning sidecars alone (docs/subsystems/app.md).
     pub live_index: LiveIndex,
     /// Named export recipes. Each is complete and explicit so re-running it
     /// reproduces the exported bytes.
@@ -64,7 +64,7 @@ pub struct SidecarDoc {
     /// `"unknown"` when built outside git). `None` = written by a
     /// pre-provenance build. Re-stamped on every save; readers MUST NOT
     /// branch on it, and it is excluded from the "identical edits →
-    /// identical bytes" claim (docs/sidecar-schema.md §2.2).
+    /// identical bytes" claim (docs/subsystems/sidecar.md §2.2).
     pub focale_version: Option<String>,
     /// Debug provenance: OS the writer ran on (`"linux"` / `"macos"` /
     /// `"windows"`, from [`std::env::consts::OS`]). Same rules as
@@ -169,7 +169,7 @@ impl SidecarDoc {
     }
 }
 
-/// Culling/index metadata (architecture.md §7): the directory view builds its entire
+/// Culling/index metadata (docs/subsystems/sidecar.md): the directory view builds its entire
 /// index from this block alone — file names and directory shape carry no
 /// meaning.
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
@@ -219,7 +219,7 @@ pub struct ExportRecipe {
     pub resize: Option<ResizeSpec>,
 }
 
-/// Output format and its encoder options (architecture.md §9 codec list). Every
+/// Output format and its encoder options (docs/subsystems/export.md codec list). Every
 /// format-specific knob that affects output bytes lives here.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum ExportFormat {
@@ -299,7 +299,7 @@ pub enum ExportGamut {
     Rec2020,
 }
 
-/// HDR output options (architecture.md §9: full capability of each format).
+/// HDR output options (docs/subsystems/export.md: full capability of each format).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct HdrOptions {
@@ -308,7 +308,7 @@ pub struct HdrOptions {
     /// Mastering peak luminance in cd/m² (nits).
     pub peak_nits: f32,
     /// Gain-map generation. A seam only in v1: recipes may carry the block
-    /// but execution rejects it (docs/architecture.md §10).
+    /// but execution rejects it (docs/subsystems/export.md).
     pub gain_map: Option<GainMapOptions>,
 }
 

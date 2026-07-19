@@ -115,7 +115,7 @@ fn extracts_fixture_metadata() {
         );
     }
 
-    // rawshift 0.1.1 exposes no optics metadata (architecture.md §5);
+    // rawshift 0.1.1 exposes no optics metadata (docs/subsystems/optics.md);
     // reported honestly as absent.
     assert!(!m.optics.vignetting);
     assert!(!m.optics.chromatic_aberration);

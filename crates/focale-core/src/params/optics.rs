@@ -1,7 +1,7 @@
 //! Stage 2: optical corrections.
 //!
 //! v1 applies corrections exclusively from embedded manufacturer metadata in
-//! the raw file (architecture.md §5). When metadata is absent the stage is skipped and
+//! the raw file (docs/subsystems/optics.md). When metadata is absent the stage is skipped and
 //! the UI shows a warning — never guessed, never failed. The per-kind
 //! toggles below let the user opt out of individual corrections; they have
 //! no effect when the corresponding metadata is missing.

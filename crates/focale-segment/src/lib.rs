@@ -1,4 +1,4 @@
-//! Local ONNX segmentation for AI masks (architecture.md §6, docs/architecture.md §6).
+//! Local ONNX segmentation for AI masks (docs/subsystems/masks.md).
 //!
 //! This crate turns a working-space image into
 //! [`focale_core::masks::ResolvedMask`] coverage bitmaps using local ONNX
@@ -39,11 +39,11 @@
 //!   face detection + per-person crops is v2.
 //! - **Sclera vs iris.** The 19-class CelebAMask-HQ label set has one eye
 //!   class per side, so [`PersonPart::Sclera`] and [`PersonPart::Iris`]
-//!   resolve to the same eye region in v1. The UI still offers both (architecture.md §6
+//!   resolve to the same eye region in v1. The UI still offers both (docs/subsystems/masks.md
 //!   lists "eyes (sclera + iris/pupil)"); a dedicated iris model can split
 //!   them in a later pipeline version.
 //! - **CPU execution.** Sessions use the default CPU execution provider —
-//!   acceptable per architecture.md §6 ("CPU fallback permitted but may be slow"). GPU
+//!   acceptable per docs/subsystems/masks.md ("CPU fallback permitted but may be slow"). GPU
 //!   execution providers (CUDA/ROCm/CoreML) are future work; enabling them
 //!   is purely a mask-creation-latency improvement and can never affect
 //!   export output because only the resolved bitmaps are stored.

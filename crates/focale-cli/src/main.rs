@@ -1,8 +1,7 @@
 //! Headless Focale: deterministic export from the command line.
 //!
 //! This binary is the reference export path. CI renders the committed
-//! fixtures on x86_64 and aarch64 and byte-compares the results (architecture.md §13,
-//! docs/architecture.md §13).
+//! fixtures on x86_64 and aarch64 and byte-compares the results (docs/verification.md).
 //!
 //! ```text
 //! focale-cli render <raw> [--sidecar <file.fcl>] [--format <f>]

@@ -1,6 +1,6 @@
-//! Editor panels: the fixed pipeline as ordered controls (architecture.md §11).
+//! Editor panels: the fixed pipeline as ordered controls (docs/subsystems/app.md).
 //!
-//! Panel order mirrors architecture.md §3 stage order exactly and cannot be reordered.
+//! Panel order mirrors docs/subsystems/pipeline.md stage order exactly and cannot be reordered.
 //! One control per function — no duplicates anywhere in the app.
 
 use eframe::egui::{self, CollapsingHeader, Sense, Slider, Ui, vec2};

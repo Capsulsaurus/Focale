@@ -1,4 +1,4 @@
-//! Golden-byte tests for the `.fcl` sidecar (architecture.md §13: golden-file tests
+//! Golden-byte tests for the `.fcl` sidecar (docs/verification.md: golden-file tests
 //! proving deterministic encoding).
 //!
 //! The canonical document below exercises every schema field. Its encoded

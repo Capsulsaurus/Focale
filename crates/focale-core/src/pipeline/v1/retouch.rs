@@ -2,7 +2,7 @@
 //!
 //! **Frozen v1 algorithm** (HARD-VER). Heal is a *mean-matched clone*
 //! (per-channel destination/source mean ratio), not a Poisson blend —
-//! content-aware retouch is out of scope for v1 (architecture.md §3 stage 8).
+//! content-aware retouch is out of scope for v1 (docs/subsystems/pipeline.md stage 8).
 //!
 //! # Determinism
 //!

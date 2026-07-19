@@ -1,7 +1,7 @@
 //! Focale core: the deterministic raw processing pipeline.
 //!
 //! Everything on the export path lives here and is CPU-only, bit-identical
-//! across machines and architectures. See `docs/architecture.md`.
+//! across machines and architectures. See `docs/README.md`.
 
 pub mod color;
 pub mod decode;

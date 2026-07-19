@@ -1,4 +1,4 @@
-//! HDR→SDR tone mapping: pipeline v1 operator (docs/architecture.md §10).
+//! HDR→SDR tone mapping: pipeline v1 operator (docs/subsystems/color.md).
 //!
 //! # Operator definition (v1 — frozen)
 //!

@@ -1,4 +1,4 @@
-//! Determinism fixtures for CI (docs/architecture.md §13).
+//! Determinism fixtures for CI (docs/verification.md).
 //!
 //! `determinism.fcl` is the committed sidecar the cross-architecture CI
 //! renders on x86_64 and aarch64 (.github/workflows/determinism.yml). The

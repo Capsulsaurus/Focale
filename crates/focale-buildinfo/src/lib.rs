@@ -2,7 +2,7 @@
 //!
 //! The single source of the strings the applications stamp into sidecar
 //! debug-provenance fields (`focale_version` / `focale_platform`,
-//! docs/sidecar-schema.md §5.1) and print from `--version`-style output.
+//! docs/subsystems/sidecar.md §5.1) and print from `--version`-style output.
 //! Lives in its own leaf crate so the deterministic-path crates
 //! (`focale-core`, `focale-sidecar`) stay free of build scripts.
 

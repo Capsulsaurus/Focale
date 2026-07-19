@@ -1,6 +1,6 @@
 //! Stage 8: retouch — heal and clone (dust-spot removal).
 //!
-//! Content-aware inpainting is out of scope for v1 (architecture.md §3 stage 8).
+//! Content-aware inpainting is out of scope for v1 (docs/subsystems/pipeline.md stage 8).
 
 use serde::{Deserialize, Serialize};
 

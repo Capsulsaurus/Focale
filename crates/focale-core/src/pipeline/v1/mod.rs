@@ -21,7 +21,7 @@ pub mod white_balance;
 use crate::image::ImageRgbF32;
 use crate::pipeline::{RenderInput, RenderOutput, RenderWarning};
 
-/// Runs pipeline v1, stages 2–10, in the fixed architecture.md §3 order, producing the
+/// Runs pipeline v1, stages 2–10, in the fixed docs/subsystems/pipeline.md order, producing the
 /// working-space image (linear Rec.2020; geometry applied; ready for an
 /// output transform).
 pub fn render(input: &RenderInput<'_>) -> RenderOutput {
@@ -30,7 +30,7 @@ pub fn render(input: &RenderInput<'_>) -> RenderOutput {
     let edit = input.edit;
 
     // Stage 2: optical corrections. v1 decode exposes no optics metadata
-    // (docs/architecture.md §5): warn and skip — never guess, never fail.
+    // (docs/subsystems/optics.md): warn and skip — never guess, never fail.
     if edit.optics.enabled
         && !(meta.optics.vignetting || meta.optics.chromatic_aberration || meta.optics.distortion)
     {
