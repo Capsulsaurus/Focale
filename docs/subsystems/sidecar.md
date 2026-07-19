@@ -1,8 +1,11 @@
 # The `.fcl` Sidecar Format — Schema v1
 
 This document specifies the Focale sidecar file format precisely enough to
-implement an independent reader or writer. It is the published schema
-required by architecture.md §7. The reference implementation is
+implement an independent reader or writer — the published schema required by
+`[HARD-VER]` and `[HARD-FS]` ([invariants](../invariants.md)). Section numbers
+in this document are **stable** (code comments cite them); additions get new
+subsection numbers, existing ones are never renumbered. The reference
+implementation is
 `crates/focale-sidecar` (`schema.rs` for the document tree, `cde.rs` for the
 encoder); the byte-level contract is frozen by the golden test fixture
 `crates/focale-sidecar/tests/golden/canonical.fcl`.
@@ -52,6 +55,16 @@ Writers MUST produce RFC 8949 **§4.2 Core Deterministic Encoding**:
 
 Identical documents therefore always serialize to identical bytes — this
 is what makes sidecar bytes hashable and diffable in CI.
+
+**Why our own canonical writer.** Serde structs bridge through
+`ciborium::Value`, but bytes are produced by our own canonical writer
+(`focale-sidecar::cde`). The shortest-form/definite-length/sorted-keys rules
+are RFC 8949 §4.2.1 (Core Deterministic Encoding Requirements); the
+float-width and NaN canonicalization follow RFC 8949 preferred serialization
+plus the IETF CBOR CDE draft (draft-ietf-cbor-cde, expired at draft-13
+without becoming an RFC — its unpublished status, and the absence of any Rust
+encoder guaranteeing these bytes, is exactly why byte production is not
+pinned to a third-party encoder's internals).
 
 Note the carve-out: identical *edits* on different machines or builds do
 **not** imply identical sidecar bytes, because the debug-provenance
@@ -208,7 +221,7 @@ claims (§2.2 carve-out).
 
 ### 5.2 `EditState`
 
-Field order below mirrors the fixed pipeline stage order (architecture.md §3). Raw
+Field order below mirrors the fixed pipeline stage order ([pipeline](pipeline.md)). Raw
 decode (stage 1) has no user parameters; the output transform (stage 11)
 is parameterized by the export recipe.
 
@@ -425,7 +438,7 @@ identical grain.
 ### 5.13 `LiveIndex`
 
 The directory view builds its entire index by scanning this block across
-sidecars — nothing else (architecture.md §11).
+sidecars — nothing else ([app](app.md), `[HARD-FS]`).
 
 | Key | Type | Default | Meaning |
 | --- | --- | --- | --- |
@@ -474,7 +487,7 @@ so the file format is decoupled from core internals.
 | --- | --- | --- | --- |
 | `transfer` | text | `"Pq"` | `"Pq"` (SMPTE ST 2084) or `"Hlg"` (ARIB STD-B67). |
 | `peak_nits` | f32 | 1000 | Mastering peak luminance, cd/m². |
-| `gain_map` | `GainMapOptions` or null | null | Gain-map request. **Seam only in v1**: an empty map `{}`; recipes may carry the block, but v1 execution rejects it (architecture §7). Fields arrive with the feature. |
+| `gain_map` | `GainMapOptions` or null | null | Gain-map request. **Seam only in v1**: an empty map `{}`; recipes may carry the block, but v1 execution rejects it ([export](export.md)). Fields arrive with the feature. |
 
 `ResizeSpec` — `{ "long_edge": u32 }`: target length of the longer output
 edge in pixels. Never upscales; values at or above the native long edge
