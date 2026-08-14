@@ -1,4 +1,4 @@
-//! Session model: strictly one directory at a time (architecture.md §11).
+//! Session model: strictly one directory at a time (docs/subsystems/app.md).
 //!
 //! Opening a directory scans it (non-recursively) for raw candidates and
 //! reads each sidecar's live-index block. File names and directory shape
@@ -31,7 +31,7 @@ pub struct Session {
     pub primary: Option<usize>,
     /// Multi-selection (filmstrip): indices into `entries`, always
     /// containing `primary` when set. Edits broadcast to every selected
-    /// entry (architecture.md §11 batch).
+    /// entry (docs/subsystems/app.md batch).
     pub selected: Vec<usize>,
 }
 

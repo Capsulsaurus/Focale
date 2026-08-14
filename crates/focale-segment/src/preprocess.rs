@@ -7,7 +7,7 @@
 //!
 //! # Colour handling
 //!
-//! The working image is linear Rec.2020 (architecture.md §3). Every model in this crate
+//! The working image is linear Rec.2020 (docs/subsystems/pipeline.md). Every model in this crate
 //! was trained on sRGB-encoded photographs, so preprocessing converts:
 //! resize in linear light first (bilinear, pixel-centre convention), then
 //! per pixel `Rec.2020 → sRGB` via [`REC2020_TO_SRGB`] and the IEC 61966-2-1
@@ -109,7 +109,7 @@ pub(crate) fn sam_scaled_size(w: u32, h: u32) -> (u32, u32) {
 }
 
 /// Half of the working resolution (rounded up, minimum 1) — the storage
-/// resolution for resolved AI masks (docs/architecture.md §6).
+/// resolution for resolved AI masks (docs/subsystems/masks.md).
 pub(crate) fn half_dims(w: u32, h: u32) -> (u32, u32) {
     (w.div_ceil(2).max(1), h.div_ceil(2).max(1))
 }

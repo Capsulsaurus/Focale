@@ -1,6 +1,6 @@
 //! End-to-end pipeline v1 integration: decode the committed fixture, run a
 //! rich edit through every stage, and pin the output as a regression golden
-//! (architecture.md §13: pipeline-version regression suite).
+//! (docs/verification.md: pipeline-version regression suite).
 
 use focale_core::decode::decode_file;
 use focale_core::masks::*;

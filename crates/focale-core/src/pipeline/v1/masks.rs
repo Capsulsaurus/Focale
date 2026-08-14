@@ -1,4 +1,4 @@
-//! Mask rasterization for pipeline v1 (architecture.md §6, docs/architecture.md §6) —
+//! Mask rasterization for pipeline v1 (docs/subsystems/masks.md) —
 //! **frozen**: the formulas documented here define the v1 output forever.
 //!
 //! A [`MaskGroup`] rasterizes to a single-channel coverage plane in `[0, 1]`

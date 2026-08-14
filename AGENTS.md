@@ -1,20 +1,28 @@
 # Focale
 
 Deterministic, guided raw photo developer. Rust workspace; GUI is winit + wgpu + egui.
-`docs/architecture.md` is the canonical spec: product requirements (HARD IDs like
-`HARD-DET`) and every design decision with rationale. The sidecar file format is
-specified in `docs/sidecar-schema.md`. Read both before changing processing code.
+The canonical spec is the doc tree under `docs/` — start at `docs/README.md` (glossary
++ subsystem map). Product requirements carry HARD IDs like `HARD-DET`
+(`docs/invariants.md`); each subsystem has its own spec in `docs/subsystems/`; the
+sidecar format is `docs/subsystems/sidecar.md`. Read the relevant subsystem doc before
+changing processing code.
 
-## Invariants (architecture.md §1 — never violate)
+## Invariants (summary derived from docs/invariants.md — never violate)
 
-- **Determinism:** the export path is CPU-only and bit-identical across machines and
-  architectures. No `fast-math`, no non-deterministic parallel reductions, fixed
-  iteration orders. GPU is preview-only.
-- **Permanent versioning:** changing any algorithm's output requires a new pipeline
-  version while keeping the old implementation. Same rule for the sidecar schema.
-- **Local-only:** no network calls anywhere in the application.
-- **AGPL-3.0:** verify license compatibility before adding any crate or model weights.
-- **One way to do each thing:** no redundant/duplicate UI controls.
+- **`HARD-DET` Determinism:** the export path is CPU-only and bit-identical across
+  machines and architectures. No `fast-math`, no non-deterministic parallel
+  reductions, fixed iteration orders. GPU is preview-only.
+- **`HARD-VER` Permanent versioning:** changing any algorithm's output requires a new
+  pipeline version while keeping the old implementation. Same rule for the sidecar
+  schema.
+- **`HARD-LOCAL` Local-only:** no network calls anywhere in the application.
+- **`HARD-LICENSE` AGPL-3.0:** verify license compatibility before adding any crate
+  or model weights.
+- **`HARD-RUST` Rust core:** all processing logic is Rust.
+- **`HARD-FS` Filesystem is the source of truth:** no catalogue database, no import
+  step; caches must be reconstructible from sidecars + files alone.
+- **One way to do each thing:** no redundant/duplicate UI controls
+  (`docs/subsystems/app.md`).
 
 ## Quality
 

@@ -1,4 +1,4 @@
-//! Background export queue (architecture.md §11 batch).
+//! Background export queue (docs/subsystems/app.md batch).
 
 use std::path::PathBuf;
 

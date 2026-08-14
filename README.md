@@ -1,6 +1,8 @@
 # Focale
 
-Mathematically-guided RAW image processor.
+> Status (July 2026): Alpha and actively developed. Star here on GitHub and stay tuned!
+
+Mathematically-guided RAW image processor and editor.
 
 ## Why This Exists
 
@@ -10,7 +12,7 @@ era. One-click tools trade away the decisions; Darktable is free but its depth i
 obstacle. Nothing serves the photographer with a trained eye who wants deliverable
 results quickly, without babysitting fifty sliders per frame.
 
-**[Name] is an AGPL raw developer built for speed with intent.** One correctness-ordered
+**Focale is an AGPL raw developer built for speed with intent.** One correctness-ordered
 pipeline, stripped of redundant controls: optics, then colour-managed development, then
 finishing. Creative range lives in masks — geometric and AI-segmented, at parity with
 the tools you're leaving — not in panel sprawl. Every edit is deterministic: the
@@ -27,13 +29,45 @@ measurement kit + open profile database, neural denoise/sharpen.
 Success bar: 20 culled frames, finished in 30 minutes, indistinguishable from your
 current editor's output.
 
-## Guiding Principles
+## Support Matrix
+
+- Platforms: macOS (Apple Silicon), Windows (x86\_64, arm\_64), Linux (Wayland) (x86\_64, arm\_64)*
+- GPUs:
+  * macOS: Apple Silicon (i.e. no external GPUs)
+  * Windows: NVIDIA, AMD
+  * Linux: VA-API (includes AMD and Intel via mesa drivers)
+- Formats**: All common image formats and some RAW image formats are currently supported. We have explicit software support by specific devices. All support is done by an underlying open-source library called `rawshift`. The exact support is best referred to the comprehensive table: <https://github.com/justin13888/rawshift/tree/master/crates/rawshift-image#format-support>
+
+> Don't see the format or camera that you need? Open a GitHub [issue directly in this repo (and not upstream)](https://github.com/Capsulsaurus/Focale/issues/new/choose)
+
+*: Linux version strictly requires a reasonably recent version of Wayland and compositor with Wayland Color Management protocol
+
+## FAQ
+
+**Q: Focale's workflow and capabilities do not cover what I need.**
+A: If you have specific critique or suggestions, please feel free to submit issue for specific feature requests or open a conversation to discuss potential resolutions. We aim to rapidly address community needs although we may push back if there are technical reasons.
+
+**Q: Why should I use Focale over <insert your existing editor here>**
+A (from creator): There can be many reasons but my biggest reason is that none of the proprietary software I have ever creates edits remains replicable in 10+ years and across all devices. We are aiming to be the best open RAW image processor/editor suitable for (most) professional use.
+
+**Q: If it were so capable, why is it free?**
+A: It was created out of need and not as some company's core life blood. The power in a better product is that it is being used and adopted as a community.
+
+**Q: The decoded images look different from what I expected.**
+A: Assuming you have verified with another software, please file a bug report. It could be a device we did not test for.
+
+**Q: I want to use another tool in conjunction.**
+A: If you have another tool you need to further process your images, your best bet like other raw processors is to *export as TIFF* and continue. We do not plan to have a button along the lines "Open in <photo editor of choice>" as we do not endorse any company's paid products, each with quite different cataloguing ideologies.
+
+## Development
+
+### Guiding Principles
 
 - Color representation: Mathematically model and expose images in physically faithful model.
 - Offer tools to extend photos with creative freedom
 - User-driven design: Everything you see feels like you can touch it. Responsive. Interactive. Intuitive.
 
-## Implementation Guidelines
+### Implementation Guidelines
 
 - Lean on open-source dependencies where possible and hand-roll for things missing. The upcoming `gamut` ecosystem should be able to handle majority of complexities in codebase.
 - UI is designed to be consistent with common applications. No user guide should be necessary to explain any new feature.
@@ -41,7 +75,7 @@ current editor's output.
 - Use Rust where possible for its memory guarantees and modern toolchain. Drop to C/C++ for native APIs if strictly necessary. Compile with LLVM for all targets.
 - Subsystems clearly define ownership of logic.
 
-## Getting Started
+### Getting Started
 
 ```bash
 just run                     # launch the desktop app (Wayland/X11)
@@ -54,10 +88,10 @@ Open a directory of raws (Sony lossless-compressed ARW or DNG in v1); cull with
 in the filmstrip to broadcast edits or use *Copy settings → Paste to selection*;
 export runs in a background queue (`focale-export/` beside your raws). Edits live in
 `<file>.<ext>.fcl` sidecars — raws are never modified, and identical sidecars render
-bit-identically on any machine, forever. See `docs/architecture.md` and
-`docs/sidecar-schema.md`.
+bit-identically on any machine, forever. See the docs index at `docs/README.md`
+(subsystem specs, glossary) and the sidecar format in `docs/subsystems/sidecar.md`.
 
-## Prerequisites
+### Prerequisites
 
 - [Rust (rustup)](https://rustup.rs) — toolchain (pinned via `rust-toolchain.toml`)
 - [just](https://github.com/casey/just) — command runner
@@ -65,7 +99,7 @@ bit-identically on any machine, forever. See `docs/architecture.md` and
 - [convco](https://github.com/convco/convco) — conventional-commit checker used by hooks
 - cmake + a C++ toolchain — builds the vendored libjxl for JPEG XL export
 
-## Development
+## Commands
 
 | Command      | Description                                  |
 | ------------ | -------------------------------------------- |
@@ -86,7 +120,7 @@ validates the message is a conventional commit; pre-push runs the full CI check 
 GitHub Actions runs format checks, clippy, tests on pushes to `master` and pull
 requests, plus conventional-commit validation on pull requests. A separate
 Determinism workflow renders the committed (raw + sidecar) fixture on x86_64 and
-aarch64 in every export format and fails if any byte differs (architecture.md §13).
+aarch64 in every export format and fails if any byte differs (`docs/verification.md`).
 
 ## Releases & Changelog
 

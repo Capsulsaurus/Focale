@@ -1,7 +1,7 @@
 //! The working image buffer: interleaved RGB f32.
 //!
 //! This is the only pixel container on the processing path. Working space is
-//! linear Rec.2020, f32, unbounded (architecture.md §3) — but the container itself is
+//! linear Rec.2020, f32, unbounded (docs/subsystems/pipeline.md) — but the container itself is
 //! space-agnostic; stages document what they expect.
 
 /// Interleaved RGB f32 image, row-major.
