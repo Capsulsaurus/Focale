@@ -22,10 +22,24 @@ satisfy them all is rejected or redesigned.
    exceptions, no deprecation. The same permanent-compatibility rule applies to
    the sidecar schema.
 3. **`[HARD-LOCAL]` Local-only.** All computation, including all future AI, runs
-   on the user's machine. No network calls in the application.
-4. **`[HARD-LICENSE]` License.** AGPL-3.0. External contributions require a CLA
-   assigning rights to the project author. All dependencies must be
-   AGPL-compatible; verify before adding any crate or model weights.
+   on the user's machine. **No network calls in the application** — the binary
+   the user runs has no networking code path at all, not merely no telemetry.
+   The boundary is the application: a sanctioned, user-invoked script may
+   download assets (model weights, [rnd/ml-models.md](rnd/ml-models.md)),
+   because the user chooses to run it, it runs outside the app, and the app
+   works — degraded but honestly — without it. An in-app "download models"
+   button would violate this principle even though the bytes are identical.
+4. **`[HARD-LICENSE]` License.** AGPL-3.0. Chosen because the network-use
+   clause (§13) is what keeps a hosted derivative from becoming a proprietary
+   fork of a local-only tool; GPL-3.0 would leave that open, and a permissive
+   licence would leave the whole work open to enclosure. The cost is accepted
+   deliberately: AGPL deters some commercial adoption and constrains
+   dependencies to AGPL-compatible licences. External contributions require a
+   CLA assigning rights to the project author, so relicensing remains possible
+   without tracing every contributor. All dependencies must be
+   AGPL-compatible; verify before adding any crate or model weights. Model
+   weights are handled as separate assets, never combined into the covered
+   work ([rnd/ml-models.md](rnd/ml-models.md)).
 5. **`[HARD-RUST]` Rust core.** All processing logic is Rust. Existing crates for
    raw decode, codecs, and math are preferred over reimplementation; do not reject
    a crate for immaturity alone.

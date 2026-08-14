@@ -62,7 +62,7 @@ time, [masks](subsystems/masks.md)).
 | **Seam** | A deliberately kept integration point for a committed future feature. | [scope](scope.md) (each seam in its subsystem doc) |
 | **Resolved mask** | AI segmentation output baked to a bitmap at creation time; models never run at export. | [masks](subsystems/masks.md) |
 | **`CorrectionSource`** | The trait seam feeding optical-correction parameters from any source. | [optics](subsystems/optics.md) |
-| **Preview base** | ≤ 2560 px downscale every interactive edit re-renders on the CPU. | [preview](subsystems/preview.md) |
+| **Preview base** | ≤ 2560 px mip level every interactive edit re-renders on the CPU; also the resolution AI masks resolve to. | [preview](subsystems/preview.md) |
 | **Active rendering gamut** | User-selected display gamut, always visible in the status bar. | [color](subsystems/color.md) |
 | **Export recipe** | Named, byte-complete export configuration stored in the sidecar. | [sidecar](subsystems/sidecar.md) §5.14, executed per [export](subsystems/export.md) |
 | **Golden fixture** | Committed byte-exact artifact CI diffs against; re-blessed only deliberately. | [verification](verification.md) |

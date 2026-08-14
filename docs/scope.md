@@ -36,6 +36,20 @@ Every feature in every doc carries exactly one of these tags:
 | `demand-driven` | Built only if user demand materializes; recorded so the decision isn't relitigated. |
 | `never` | Out of scope permanently, with rationale. Reversing requires amending this document. |
 
+A **seam** is a deliberately kept integration point for a committed future
+feature: a trait, a schema field, a scheduler hook, or a module boundary that
+exists in shipped code with no user-visible behaviour behind it yet. A seam is
+an obligation the tag creates — `v2 (committed)` means the seam is built and
+maintained now, so the feature lands without re-architecting; `eventually`
+carries no such obligation, only the weaker duty not to preclude the feature.
+Each seam is specified in its own subsystem doc; this file records only which
+tier obliges one.
+
+A `high-priority future` item names its blocker explicitly. Where the blocker
+is unresolved research, the *research gate itself* is the committed
+deliverable — a feature is never scheduled on the assumption that an open
+question resolves favourably.
+
 ## v1
 
 The v1 feature set, per subsystem (each doc carries the detail and its own
@@ -48,11 +62,18 @@ shipped/gap tags): [pipeline](subsystems/pipeline.md),
 [directory sessions, culling, batch](subsystems/app.md),
 [sidecar format](subsystems/sidecar.md).
 
-Known v1 gaps (all sub-issues of #1): optical-correction math (#7), wide-gamut
-display output (#6, #10), uncompressed/lossy ARW decode (#12, upstream),
-multi-person parsing (#8) and sclera/iris separation (#9) — model-capability
-limits, preview benchmark & instrumentation (#11), macOS CI (#10), 20-in-30
-validation run (#1).
+Known v1 gaps, all sub-issues of #1:
+
+| Gap | Issue | Nature |
+| --- | --- | --- |
+| Optical-correction math | #7 | Unbuilt; the parameter model and stage behaviour are specified normatively in [optics](subsystems/optics.md). |
+| Wide-gamut display output | #6 (Wayland), #10 (macOS) | One capability, one blocker, two platform halves: both wait on egui/eframe moving to wgpu ≥ 30, then #6 wires the Wayland surface colour space and #10 the macOS side ([color](subsystems/color.md)). |
+| Uncompressed / lossy ARW decode | #12 | Blocked upstream on the decode crate; affected files fail with a clear per-file error ([decode](subsystems/decode.md)). |
+| Multi-person parsing | #8 | Model-capability limit, not an implementation limit — the schema already expresses it ([masks](subsystems/masks.md)). |
+| Sclera / iris separation | #9 | Model-capability limit, as above. |
+| Preview benchmark & instrumentation | #11 | The < 100 ms target is an unmeasured budget ([preview](subsystems/preview.md)). |
+| macOS build, colour-space tagging & CI | #10 | A first-class target with no CI and no platform-specific code; the same issue covers its half of wide-gamut output ([verification](verification.md)). |
+| 20-in-30 validation run | #1 | The acceptance bar above, not yet run end-to-end. |
 
 ## v2 (committed)
 
@@ -61,8 +82,14 @@ validation run (#1).
 - **Lens measurement kit + open correction-profile database** — separate project;
   integration seam in [optics](subsystems/optics.md); design in
   [rnd/lens-database.md](rnd/lens-database.md).
-- **Neural denoise and sharpening** — new pipeline-versioned stages; blocked on
-  the deterministic inference runtime ([rnd/inference.md](rnd/inference.md)).
+- **The deterministic export-path inference runtime** — the research gate in
+  [rnd/inference.md](rnd/inference.md) is itself the committed deliverable:
+  prototype, cross-architecture golden validation, benchmark, record. No
+  export-path neural stage is scheduled until it passes, and it is listed here
+  as work in its own right precisely so the features below are not mistaken
+  for being closer than their blocker.
+- **Neural denoise and sharpening** — new pipeline-versioned stages;
+  **blocked on** the runtime gate above ([rnd/inference.md](rnd/inference.md)).
 - **Culling interop via XMP** — one-way derived XMP mirror + one-time import;
   `.fcl` stays the source of truth ([app](subsystems/app.md#culling--xmp-interop)).
 - **Gain-map export** — the export-recipe schema already carries the seam
@@ -72,11 +99,14 @@ validation run (#1).
 
 ## High-priority future
 
-- **Super-resolution** — a new pipeline-versioned stage at the end of the
-  pipeline (after detail/denoise), available in **preview and export**, not an
-  export-only option. Because it runs on the export path it inherits
-  `[HARD-DET]`, so it is blocked on the deterministic inference runtime
-  ([rnd/inference.md](rnd/inference.md); roadmap detail in
+- **Super-resolution** — a new pipeline-versioned stage at **stage 9.5**,
+  after geometry and before the output transform, so that nothing spatial
+  follows it and it is the pipeline's last resample
+  ([pipeline](subsystems/pipeline.md) carries the placement rationale).
+  Available in **preview and export** — never an export-only option, per the
+  preview-renders-the-export-pipeline rule. Because it runs on the export path
+  it inherits `[HARD-DET]`; blocked on the deterministic inference runtime
+  gate ([rnd/inference.md](rnd/inference.md); roadmap detail in
   [rnd/ml-models.md](rnd/ml-models.md)).
 
 ## Eventually

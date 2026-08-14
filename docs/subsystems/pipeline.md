@@ -20,8 +20,11 @@ them. Order:
    curve (parametric + point curve).
 5. **Global colour** — HSL per-band, colour grading (shadows/midtones/highlights
    wheels), vibrance/saturation.
-6. **Local adjustments** — any subset of stages 4–5 parameters applied through
-   masks ([masks](masks.md)).
+6. **Local adjustments** — stage 4–5 parameters applied through masks
+   ([masks](masks.md)). The locally-available set is defined by the schema
+   ([sidecar](sidecar.md) §5.7), which is narrower than stages 4–5 in v1 and
+   widens additively; local adjustments are always deltas over the global
+   result, never a second independent pass.
 7. **Detail** — capture sharpening (unsharp/deconvolution) and conventional noise
    reduction (luma/chroma). Non-neural in v1; the v2 neural replacements arrive
    as new pipeline-versioned stages (`v2 (committed)`,
@@ -37,8 +40,38 @@ them. Order:
     ([color](color.md)), executed by `focale-export` ([export](export.md)).
 
 A future **super-resolution** stage (`high-priority future`,
-[scope](../scope.md#high-priority-future)) slots at the end of the pipeline after
-detail/denoise, in both preview and export, as a new pipeline-versioned stage.
+[scope](../scope.md#high-priority-future)) slots in as **stage 9.5** — after
+geometry, before the output transform — as a new pipeline-versioned stage
+available in both preview and export.
+
+Why there, rather than earlier or at encode time. Super-resolution
+synthesizes detail, and any *spatial* stage that runs after it amplifies what
+it invented: sharpening hardens SR artifacts, noise reduction is fed
+statistics no sensor produced, and a resample re-filters synthetic edges.
+So nothing spatial may follow it, which puts it after detail (7), retouch
+(8), and geometry (9) — and makes it the pipeline's last resample, operating
+on an image that is already denoised, sharpened, and geometry-final. It is
+*not* an encoder-side upscale: the output transform (11) is a per-pixel
+colour operation that neither disturbs nor is disturbed by resolution, and
+finishing (10) is deliberately after it so grain and vignette are applied at
+final output scale rather than being magnified. Placing SR at decode instead
+would force every subsequent stage to run at the upscaled resolution for no
+quality gain.
+
+## Preview renders the export pipeline (`[HARD-DET]`)
+
+**Preview and export run the same stage set, in the same order, with the same
+parameters — the only difference permitted is the resolution of the input
+buffer.** A stage may never be preview-only or export-only, and no stage may
+branch on whether it is rendering for preview.
+
+This is what makes the viewport an honest proof of the exported file, and it
+is why super-resolution is specified as a pipeline stage rather than an export
+option: an export-only stage would mean the user never sees what they ship.
+The corollary is a performance obligation rather than an escape hatch —
+every stage must be affordable at preview-base resolution
+([preview](preview.md)), and an export is then the same computation carried
+out at full resolution and handed to an encoder.
 
 ## Working space
 

@@ -25,6 +25,22 @@ Owning code: `focale-core/src/decode`. Governing invariants: `[HARD-DET]`,
   `eventually` ([scope](../scope.md#eventually)). rawshift's row-parallel
   demosaic writes disjoint rows from immutable input, so it is deterministic
   under any thread count.
+- **X-Trans is pinned to `Markesteijn`** per pipeline version, on the same
+  terms as `Bayer(Amaze)` and for the same reason: the pin is a property of
+  the *pipeline version*, not of which bodies happen to be supported, so it
+  must be stated before a Fuji file is ever decoded rather than chosen ad hoc
+  when one is. Markesteijn is the only X-Trans algorithm rawshift offers and
+  the reference implementation elsewhere in the open-source ecosystem. No
+  X-Trans body is exercised by the v1 fixture set, so the path is specified
+  but untested — treat first Fuji support as requiring golden coverage, not
+  merely a decode that runs.
+- **Unsupported files fail per-file, never silently.** A file whose
+  compression or sensor layout this build cannot decode surfaces a
+  user-visible error naming the file and the specific unsupported property
+  (e.g. "uncompressed ARW is not supported by this build"); the rest of the
+  directory continues to load. Decode errors never fall back to a different
+  algorithm or a partial image — a wrong-but-rendered frame is worse than a
+  clear refusal.
 - **Camera colour matrix** (XYZ→camera, DNG convention) comes from rawshift's
   bundled per-model database with dual-illuminant CCT interpolation; DNG files
   use their embedded `ColorMatrix1/2`. The `gamut` crate is not used at the

@@ -24,9 +24,10 @@ Status: `v1 (shipped)`, with the two model-capability limits noted below.
 - Geometric and range masks are stored **parametrically** in the sidecar and
   rasterized on the CPU with fixed iteration order; rasterization is part of the
   versioned pipeline (`[HARD-DET]`).
-- AI masks are resolved at creation time into 8-bit coverage bitmaps at 1/2 the
-  segmentation input resolution (the preview base in the app — quality/size
-  balance), deflate-compressed in the sidecar *(chosen over vectorization —
+- AI masks are resolved at creation time into 8-bit coverage bitmaps at the
+  **preview base** resolution (long edge ≤ 2560 px, defined by
+  [preview](preview.md) — a quality/size balance, and the resolution the
+  segmentation actually ran on), deflate-compressed in the sidecar *(chosen over vectorization —
   exact, simple, deterministic; vectorization would lose the model's soft
   edges)*. Export upsamples bilinearly — deterministic, versioned. Because
   resolution happens at creation time, exports never re-run a model — this is

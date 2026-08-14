@@ -7,12 +7,27 @@ background work is prioritized. Owning code: `focale-app` (`preview`, `jobs`,
 
 ## One implementation of the pipeline math
 
-Decode happens once per image; the result is immediately box-downscaled to a
-preview base (long edge ≤ 2560 px) and the full-resolution buffer dropped. Every
-slider change re-runs the CPU pipeline on that base; v1 ships without per-stage
-caching (the seam for it is the preview scheduler). The GPU does exactly one
-thing: the colour-managed blit (working→display) plus zoom/pan sampling
-([color](color.md)).
+Decode happens once per image. The demosaiced result is retained as a **mip
+pyramid**: level 0 is the full-resolution image, and successive levels are
+box-downscaled by 2 down to the **preview base** (long edge ≤ 2560 px), the
+level every interactive edit renders on. Every slider change re-runs the CPU
+pipeline on that base; v1 ships without per-stage caching (the seam for it is
+the preview scheduler). The GPU does exactly one thing: the colour-managed
+blit (working→display) plus zoom/pan sampling ([color](color.md)).
+
+Retention is deliberate, and it is the one place preview spends memory to buy
+honesty. Fit-to-window renders the preview-base level; **1:1 zoom renders the
+visible tile from level 0**, because a 1:1 view whose pixels were upsampled
+from a 2560 px base would misrepresent exactly the things 1:1 exists to judge
+— sharpening, noise, and retouch. Budget roughly 1.33× the full-resolution
+buffer for the whole pyramid (~340 MB in f32 RGB for a 60 MP frame), which is
+why the pyramid is per *open* image, not per directory entry, and is dropped
+when the image closes. Re-decoding on zoom instead was rejected: it puts a
+full decode inside an interaction.
+
+The stage set never varies with resolution — preview runs the export pipeline
+([pipeline](pipeline.md)), so what the viewport shows is the exported file at
+a different scale, not an approximation of it.
 
 **Rationale:** the GPU preview must stay perceptually faithful to the CPU path
 forever, across every pipeline version. Duplicating eleven stages in WGSL doubles
@@ -21,9 +36,6 @@ slider-to-screen figure ([platform](platform.md) targets) is a *budget, not a
 measurement* — no benchmark exists yet; instrumentation and a reproducible
 benchmark are `v1 (gap, issue #11)`. If profiling falsifies the single-pipeline
 design, the seam is the preview scheduler, not the stage code.
-
-Preview quality: fit-to-window renders on a mip of the demosaiced image; 1:1 zoom
-renders the visible tile at full resolution.
 
 ## Job scheduler
 

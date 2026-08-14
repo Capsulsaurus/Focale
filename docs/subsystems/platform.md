@@ -48,17 +48,62 @@ travels with every artifact), no store may inject networking/telemetry
   "solved" by a database of imported copies — that would violate `[HARD-FS]`.
   The one sanctioned download path (the model-fetch script,
   [rnd/ml-models.md](../rnd/ml-models.md)) runs on the host, outside the app, so
-  the Flatpak manifest requests no network permission at all. Rejected: AppImage (no
+  the Flatpak manifest requests no network permission at all.
+
+  **Verified 2026-07-20 — how `[HARD-LOCAL]` is expressed to Flathub.** There
+  is no way to *declare* "no network": writing `--unshare=network` is a
+  `flatpak-builder-lint` **error** (`finish-args-has-unshare-network`), because
+  negated permissions are redundant against a sandbox that already denies by
+  default. No-network is expressed by **omitting `--share=network` from
+  `finish-args`** — which is what Focale does, and it is what users see on the
+  listing. Flathub has **no written policy** on applications downloading assets
+  post-install (the docs set was read in full; the absence is the finding), and
+  runtime downloads are permitted in practice — but they require
+  `--share=network`, which would publish a "Network access" permission that
+  contradicts `[HARD-LOCAL]` regardless of what the code does. That is the
+  reason the fetch path stays outside the app.
+
+  **Preferred mechanism for weights under Flatpak: `extra-data`.** Flatpak
+  itself fetches each artifact at *install* time from a URL pinned by `sha256`
+  + `size`, before the app runs — so the app ships with no network permission
+  and stays provably offline, while hash pinning is preserved exactly as
+  [rnd/ml-models.md](../rnd/ml-models.md) requires. Flathub's repo-size ceiling
+  is 12 GiB, far above our needs. Caveat to settle in the submission PR:
+  `extra-data` is documented around *non-redistributable* and multi-GB sources,
+  so for redistributable weights it is a size/UX choice rather than an
+  obligation, and no doc addresses that case.
+
+  Rejected: AppImage (no
   runtime isolation, glibc pinning pain, weak update story), Snap
   (Canonical-controlled store, poor fit for a non-Ubuntu audience), raw tarball
   (kept only as a CI artifact, unsupported).
 - **macOS: DMG on GitHub Releases + Homebrew cask.** A cask (not a formula) is
   the correct Homebrew artifact for a GUI `.app`; it points at the same DMG.
-  Served initially from a project-owned tap (`Capsulsaurus/homebrew-focale`) —
-  official `homebrew-cask` inclusion has notability thresholds, revisit once
-  met. Constraint recorded: distribution outside the App Store still requires
-  Developer ID signing + notarization (annual Apple fee) or users face
-  Gatekeeper friction. Rejected: Mac App Store — sandbox entitlements fight the
+  Served initially from a project-owned tap (`Capsulsaurus/homebrew-focale`).
+
+  **Corrected 2026-07-20 — signing, not notability, is the binding
+  constraint.** The notability thresholds are real (75 stars / 30 forks / 30
+  watchers, or **225 stars / 90 forks / 90 watchers for a self-submission by
+  the repo owner**, per `docs.brew.sh/Package-Acceptance-Policy`), but they
+  are moot: Homebrew 5.0.0 (2025-11-12) deprecated unsigned casks and will
+  **disable all `homebrew-cask` casks that fail Gatekeeper checks in
+  September 2026**, reaffirmed in 6.0.0 (2026-06-11). `--no-quarantine` is
+  deprecated, and Acceptable-Casks forbids requiring Gatekeeper to be
+  bypassed. **An unsigned Focale cannot enter `homebrew-cask` at any star
+  count.** Gatekeeper friction is also worse than recorded: control-click-to-open
+  was removed in macOS 15 and not restored, so users must go to System
+  Settings → Privacy & Security → Open Anyway, and macOS 26 often shows a
+  misleading "app is damaged" dialog instead.
+
+  This makes Developer ID signing + notarization (**$99/yr**) a decision the
+  project must take before September 2026, not an optional polish item.
+  Unsigned-viable alternatives if that fee is declined: **MacPorts** (no
+  notability bar, source-built, signing irrelevant — the best fit for an AGPL
+  Rust workspace), Nix/nix-darwin, a self-hosted tap (document the
+  fully-qualified `brew install --cask Capsulsaurus/focale/focale` to sidestep
+  Homebrew 6.0.0 Tap Trust), or a direct DMG with documented `xattr` removal.
+
+  Rejected: Mac App Store — sandbox entitlements fight the
   arbitrary-directory session model, and store terms sit uneasily with AGPL.
 - **Windows 10+ (when demand triggers it): MSI + winget.** MSI built with
   cargo-wix; a winget manifest in `microsoft/winget-pkgs` pointing at the

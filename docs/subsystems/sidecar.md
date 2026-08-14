@@ -249,6 +249,15 @@ have no effect when the corresponding metadata is missing.
 | `chromatic_aberration` | bool | `true` | Correct lateral CA. |
 | `distortion` | bool | `true` | Correct geometric distortion. |
 
+The four booleans are *user intent*, not correction data. Because
+[optics](optics.md) requires that applied correction parameters be recorded
+at edit time so exports never re-query a `CorrectionSource`, the resolved
+parameters need a home in this document. That home is `correction`, an
+additive field specified in §5.15 — **normative for issue #7, not written by
+v1** (the correction math itself is `v1 (gap, issue #7)`; today's builds
+write only the toggles above, and a reader must default `correction` to
+null).
+
 ### 5.4 `WhiteBalanceParams` (stage 3)
 
 An enum. Default: `"AsShot"`.
@@ -324,6 +333,23 @@ no tint), "luminance": f32 −100..=+100 }`.
 | `tint_wheel` | `GradingWheel` | Single grading tint within the mask. |
 | `vibrance`, `saturation` | f32 | −100..=+100 offsets. |
 
+**Planned additive extension (not written by v1).** [pipeline](pipeline.md)
+stage 6 defines local adjustments as *any* subset of the stage 4–5
+parameters; the shipped set above is narrower — it omits per-band HSL and
+offers a single `tint_wheel` where stage 5 has three grading wheels. The
+resolved direction is to widen the schema rather than narrow the pipeline
+promise, by adding two optional keys with absent-means-no-change defaults:
+
+| Key | Type | Default | Meaning |
+| --- | --- | --- | --- |
+| `hsl` | `HslBands` or null | null | Per-band HSL offsets within the mask (§5.6 shape). |
+| `grading` | `ColorGrading` or null | null | Full three-way grading within the mask (§5.6 shape); supersedes `tint_wheel`, which stays readable forever. |
+
+Both are additive within `schema_version` 1 per §3.4 (new keys, documented
+defaults, no change to existing field meanings), so no schema bump is
+required when they land. Until they do, `tint_wheel` is the only local
+grading control. Needs a tracking issue before implementation.
+
 ### 5.8 Masks
 
 `MaskGroup` — `{ "name": String, "components": [MaskComponent, …] }`.
@@ -339,6 +365,15 @@ against an empty (all-zero) coverage.
 | `feather` | f32 | Edge feather radius as a fraction of the long edge, 0..=0.25. |
 | `density` | f32 | Maximum-opacity scale, 0..=1. |
 | `shape` | `MaskShape` | The shape (one-entry map, below). |
+
+**Two distinct `feather` parameters exist and do not interact.** The
+component-level `feather` above is a *frame-relative* length (fraction of the
+long edge, §4) applied to the component's finished coverage. The `feather`
+inside `BrushStroke` and `RetouchStroke` is *stamp-relative* (fraction of that
+stamp's own radius) and shapes each stamp as it is laid down. They compose in
+that order — stamps are feathered individually while painting, then the
+assembled component coverage is feathered again as a whole — and neither
+value is derived from or clamped against the other.
 
 `MaskShape` variants:
 
@@ -368,7 +403,7 @@ against an empty (all-zero) coverage.
 | Key | Type | Meaning |
 | --- | --- | --- |
 | `kind` | `SegmentKind` | What was segmented (below). |
-| `width`, `height` | u32 | Bitmap dimensions in pixels (typically 1/2 raw resolution). |
+| `width`, `height` | u32 | Bitmap dimensions in pixels: the **preview base** (long edge ≤ 2560 px), whose definition is owned by [preview](preview.md). Readers must not assume any relationship to the raw dimensions — the frame of reference is the normalized coordinate system of §4, and the bitmap is scaled to whatever the render target needs. |
 | `deflate_bitmap` | bytes | Deflate(zlib)-compressed 8-bit coverage, row-major, exactly `width × height` bytes when decompressed; 255 = full coverage. Upsampled bilinearly at render time. |
 
 `SegmentKind` variants: `"Subject"`, `"Sky"`, `"Background"`, `"Object"`,
@@ -376,6 +411,18 @@ against an empty (all-zero) coverage.
 people), `{ "PersonPart": { "index": u8, "part": PersonPart } }`.
 `PersonPart` variants: `"FaceSkin"`, `"BodySkin"`, `"Hair"`,
 `"Eyebrows"`, `"Sclera"`, `"Iris"`, `"Lips"`, `"Teeth"`, `"Clothing"`.
+
+**The schema is deliberately wider than the v1 models.** The format is
+frozen forever, so it encodes the full target vocabulary; the v1 model set
+cannot yet produce all of it ([masks](masks.md)). Concretely: `index` is
+always 0 in v1 because the face parser runs whole-frame and reports a single
+person (`v1 (gap, issue #8)`), and `"Sclera"` and `"Iris"` resolve to the
+same eye region because the CelebAMask-HQ label set has one eye class per
+side (`v1 (gap, issue #9)`). This is intentional — model upgrades then
+populate existing variants instead of forcing a schema bump, and a
+third-party writer with better models may legitimately emit values v1 never
+writes. Readers must therefore handle every variant, not just the v1-reachable
+subset.
 
 ### 5.9 `DetailParams` (stage 7)
 
@@ -452,7 +499,9 @@ sidecars — nothing else ([app](app.md), `[HARD-FS]`).
 
 A recipe records **every option that affects output bytes**, explicitly:
 re-running a recipe against the same raw + edit + pipeline version
-reproduces the exported file bit-identically.
+reproduces the exported file bit-identically. Not every combination of the
+fields below is encodable; §5.16 specifies which recipes are valid and how
+invalid ones are rejected.
 
 | Key | Type | Default | Meaning |
 | --- | --- | --- | --- |
@@ -481,6 +530,21 @@ reproduces the exported file bit-identically.
 `focale_core::color::Gamut` at export time; the schema keeps its own enum
 so the file format is decoupled from core internals.
 
+**Tone-map white point.** The HDR→SDR tone map ([color](color.md)) needs the
+linear input value that maps to 1.0. In v1 this is *not* a recipe field: it
+is the pinned per-pipeline-version constant
+`focale_core::color::REINHARD_WHITE_DEFAULT` = **4.0** (two stops above
+diffuse white), used identically by the export path and the preview viewport
+— which is what makes the two agree. Changing it changes output bytes, so
+under `[HARD-VER]` it can only change in a new pipeline version.
+
+*Planned additive extension (not written by v1):* exposing HDR headroom as a
+user control adds `tonemap_white` (f32, > 0, default 4.0) to `ExportColor`.
+It is additive per §3.4 — absent means the pinned default, so every existing
+document keeps rendering identically. Deferred because no UI needs it yet;
+recorded so the field name and default are not relitigated. Needs a tracking
+issue before implementation.
+
 `HdrOptions`:
 
 | Key | Type | Default | Meaning |
@@ -492,6 +556,79 @@ so the file format is decoupled from core internals.
 `ResizeSpec` — `{ "long_edge": u32 }`: target length of the longer output
 edge in pixels. Never upscales; values at or above the native long edge
 leave the image unresized.
+
+### 5.15 `ResolvedCorrection` (normative for issue #7, not written by v1)
+
+The `correction` key of `OpticsParams` (§5.3). null — the v1 default and the
+only value v1 writes — means "no correction data was resolved"; the stage is
+skipped and the UI warns ([optics](optics.md)). A non-null value is the
+correction parameter set **as applied at edit time**, so the export path
+replays recorded numbers and never consults a `CorrectionSource`
+(`[HARD-DET]`, `[HARD-VER]` — the same creation-time-resolution pattern as
+AI masks, §5.8).
+
+| Key | Type | Default | Meaning |
+| --- | --- | --- | --- |
+| `source` | String | — | Provenance, for the status bar and for debugging (e.g. `"EmbeddedMetadata"`, or a profile identifier once the v2 database lands). Opaque to readers: never branch on it. |
+| `optical_center` | `[f32; 2]` | `[0.5, 0.5]` | The centre all radial forms are measured about, in the normalized pre-geometry frame (§4). Frame centre unless the source states otherwise. |
+| `vignette` | `RadialForm` or null | null | Radial gain. |
+| `distortion` | `RadialForm` or null | null | Rectilinear warp. |
+| `ca_red` / `ca_blue` | `RadialForm` or null | null | Lateral CA, per channel relative to green. |
+
+`RadialForm` is a one-entry map naming which of the two parameterizations
+[optics](optics.md) defines was recorded:
+
+- `{ "Poly": { "k": [f32; 4] } }` — the DNG radial polynomial coefficients
+  `k0..k3`.
+- `{ "Spline": { "knots": [f32, …] } }` — evenly-spaced radial spline knots
+  from 0 to the corner radius (the Sony MakerNote form). At least two knots;
+  evaluated with the interpolation pinned in [optics](optics.md).
+
+Recording the *resolved* form rather than a lens identifier is deliberate:
+identifiers would make an export depend on a database that can change or
+disappear, which `[HARD-DET]` forbids.
+
+### 5.16 Export-recipe validity
+
+§5.14's field types are deliberately independent — `format`, `color`, and
+`hdr` are orthogonal in the schema — but not every combination is
+encodable. A recipe is a *request*; the constraints below decide whether it
+can be honoured, and they live here (not only in encoder prose) because an
+independent implementation must reject the same recipes Focale does.
+
+**Rejection, never substitution.** An invalid recipe fails with a clear
+error naming the conflict; execution never silently swaps in a nearby format
+or gamut. Quietly changing the user's stated output would break the promise
+that a recipe reproduces a file bit-identically. The UI never constructs an
+invalid combination in the first place — these rules exist for
+hand-written, third-party, and future-version documents.
+
+Per-field domains (violations are `InvalidRecipe`):
+
+| Field | Valid values |
+| --- | --- |
+| `Png.bit_depth` | 8 or 16 |
+| `Jpeg.quality` | 1..=100 |
+| `JpegXl.distance` | 0.0..=15.0 |
+| `JpegXl.bit_depth` | 8 or 16 |
+| `Avif.quality` | 1..=100 |
+| `Avif.bit_depth` | 8, 10, or 12 |
+| `HdrOptions.peak_nits` | positive and finite |
+
+Cross-field constraints (violations are `Unsupported` — the recipe is
+well-formed but this version cannot encode it):
+
+| Combination | Outcome |
+| --- | --- |
+| `hdr` non-null + `Tiff16` | Rejected: the 16-bit hand-off format is SDR in v1. |
+| `hdr` non-null + `Jpeg` | Rejected: HDR JPEG depends on gain maps (`v2 (committed)`). |
+| `hdr.gain_map` non-null, any format | Rejected in v1: seam only ([export](export.md)). |
+| `Avif` + `gamut: "AdobeRgb"` | Rejected: H.273 defines no code point for Adobe RGB primaries and the AVIF writer embeds no ICC, so the file could not be labelled truthfully. Choose sRGB, Display P3, or Rec. 2020. |
+
+Everything not listed is valid. Note the asymmetry this creates: Adobe RGB
+is expressible for every other format because those carry an ICC profile,
+so the constraint is a property of AVIF's signalling model, not of the
+gamut.
 
 ## 6. Writing safely
 
@@ -516,3 +653,7 @@ document.
 7. Treat `focale_version` and `focale_platform` as opaque debug strings:
    never parse them for behaviour. When writing, stamp your own writer
    identification (or null) on every save.
+8. Reject invalid export recipes per §5.16 rather than substituting a
+   nearby format or gamut.
+9. Handle every `SegmentKind` / `PersonPart` variant (§5.8), not just the
+   subset Focale's current models can produce.
