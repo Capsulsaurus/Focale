@@ -9,13 +9,14 @@ use eframe::egui::{self, Color32, ColorImage, Key, RichText, TextureHandle};
 use focale_core::color::{Gamut, luminance_rec2020, map_to_gamut, srgb_encode};
 use focale_core::params::EditState;
 use focale_core::pipeline::RenderWarning;
+use focale_core::preview::{self, PreviewBase, PreviewFrame};
 use focale_sidecar::schema::Flag;
 use focale_sidecar::{SidecarDoc, SidecarError};
 
 use crate::export_queue::{self, ExportItem, ExportStatus};
 use crate::jobs::{JobHandle, Priority, Scheduler};
 use crate::panels;
-use crate::preview::{self, PreviewBase, PreviewFrame};
+use crate::perf::{PerfStats, RenderTiming};
 use crate::session::Session;
 use crate::suggest::{self, SuggestionSet};
 use crate::thumbs;
@@ -25,7 +26,7 @@ use crate::viewport::{self, ViewportCallback, ViewportRenderer};
 enum Msg {
     Base(PathBuf, Result<PreviewBase, String>),
     AiMask(PathBuf, Result<focale_core::masks::ResolvedMask, String>),
-    Frame(PathBuf, Result<Box<PreviewFrame>, String>),
+    Frame(PathBuf, Result<Box<PreviewFrame>, String>, RenderTiming),
     Thumb(PathBuf, ColorImage),
     Export(usize, ExportStatus),
     Suggest(PathBuf, SuggestionSet),
@@ -106,6 +107,9 @@ pub struct FocaleApp {
     /// data dir. `None` until first use.
     segmenter: std::sync::Arc<std::sync::Mutex<focale_segment::Segmenter>>,
     segmenting: bool,
+    /// Slider-to-screen latency measurement (issue #11). The F12 overlay is
+    /// off by default; timings are always logged under `focale_app::perf`.
+    perf: PerfStats,
 }
 
 impl FocaleApp {
@@ -160,6 +164,7 @@ impl FocaleApp {
                 focale_segment::ModelPaths::user_default(),
             ))),
             segmenting: false,
+            perf: PerfStats::default(),
         }
     }
 
@@ -262,11 +267,16 @@ impl FocaleApp {
         }
         let tx = self.tx.clone();
         let path = base.path.clone();
+        // Issue #11: the clock starts here — this is the slider change, and
+        // everything from the scheduler queue onward is measured against it.
+        let queued = RenderTiming::queued_now();
         let handle = self.scheduler.submit(Priority::Preview, move || {
+            let started = std::time::Instant::now();
             let result = preview::render(&base, &edit, pipeline_version, version)
                 .map(Box::new)
                 .map_err(|e| e.to_string());
-            let _ = tx.send(Msg::Frame(path, result));
+            let timing = RenderTiming::new(queued, started, std::time::Instant::now());
+            let _ = tx.send(Msg::Frame(path, result, timing));
         });
         self.render_pending = Some(handle);
     }
@@ -432,18 +442,21 @@ impl FocaleApp {
                     self.warnings.clear();
                     self.frame = None;
                 }
-                Msg::Frame(path, Ok(f)) => {
+                Msg::Frame(path, Ok(f), timing) => {
                     if Some(&path) == self.primary_path().as_ref()
                         && f.version >= self.frame_uploaded
                     {
                         self.warnings = f.warnings.clone();
                         self.render_error = None;
-                        self.upload_frame(frame, &f);
+                        let size = (f.image.width(), f.image.height());
+                        if self.upload_frame(frame, &f) {
+                            self.perf.frame_uploaded(timing, size);
+                        }
                         self.frame = Some(*f);
                         self.schedule_suggestions(false);
                     }
                 }
-                Msg::Frame(path, Err(e)) => {
+                Msg::Frame(path, Err(e), _) => {
                     if Some(&path) == self.primary_path().as_ref() {
                         tracing::error!("render failed for {}: {e}", path.display());
                         self.warnings.clear();
@@ -484,9 +497,12 @@ impl FocaleApp {
         }
     }
 
-    fn upload_frame(&mut self, frame: &eframe::Frame, f: &PreviewFrame) {
+    /// Uploads the rendered frame to the GPU. Returns whether the upload
+    /// actually happened, so latency is only recorded for frames that
+    /// reached the texture (issue #11).
+    fn upload_frame(&mut self, frame: &eframe::Frame, f: &PreviewFrame) -> bool {
         let Some(rs) = frame.wgpu_render_state() else {
-            return;
+            return false;
         };
         let mut renderer = rs.renderer.write();
         if let Some(vp) = renderer.callback_resources.get_mut::<ViewportRenderer>() {
@@ -499,7 +515,9 @@ impl FocaleApp {
                 f.version,
             );
             self.frame_uploaded = f.version;
+            return true;
         }
+        false
     }
 
     fn request_thumbnails(&mut self) {
@@ -528,6 +546,14 @@ impl FocaleApp {
 impl eframe::App for FocaleApp {
     fn ui(&mut self, root: &mut egui::Ui, frame: &mut eframe::Frame) {
         let ctx = root.ctx().clone();
+        // First thing in the frame: a texture uploaded during the previous
+        // frame has now been submitted and presented (issue #11 — see
+        // `perf` for why this is the earliest honest stamp). Must run
+        // before `handle_messages`, which may queue a new pending sample.
+        self.perf.stamp_presented();
+        if ctx.input(|i| i.key_pressed(Key::F12)) {
+            self.perf.overlay = !self.perf.overlay;
+        }
         self.handle_messages(&ctx, frame);
         self.request_thumbnails();
 
@@ -817,6 +843,9 @@ impl eframe::App for FocaleApp {
                     background: 0.016,
                 },
             );
+            if self.perf.overlay {
+                perf_overlay(ui, rect, &self.perf);
+            }
         });
 
         self.keyboard(&ctx);
@@ -829,6 +858,53 @@ impl eframe::App for FocaleApp {
     fn on_exit(&mut self) {
         self.flush_dirty(true);
     }
+}
+
+/// Debug latency overlay, toggled with F12 (issue #11).
+///
+/// Deliberately *not* a status-bar field: the status bar is a persistent
+/// keyed contract (`docs/subsystems/app.md`), and preview latency is a
+/// developer diagnostic. The budget it is measured against is < 100 ms
+/// (`docs/subsystems/platform.md`).
+fn perf_overlay(ui: &egui::Ui, rect: egui::Rect, perf: &PerfStats) {
+    let Some(last) = perf.last() else {
+        return;
+    };
+    let budget_exceeded = last.total_ms > 100.0;
+    let mut text = format!(
+        "slider→screen {:.1} ms   [{}×{}]\n\
+         queue {:.1}  pipeline {:.1}  upload {:.1}  present {:.1}",
+        last.total_ms,
+        last.size.0,
+        last.size.1,
+        last.queue_ms,
+        last.pipeline_ms,
+        last.upload_ms,
+        last.present_ms,
+    );
+    if let (Some(median), Some(max)) = (perf.median_total_ms(), perf.max_total_ms()) {
+        text.push_str(&format!(
+            "\nmedian {median:.1}  max {max:.1}  (n={})",
+            perf.count()
+        ));
+    }
+    text.push_str("\npresent includes the vsync wait — see perf.rs");
+
+    let painter = ui.painter();
+    let anchor = rect.left_top() + egui::vec2(8.0, 8.0);
+    let galley = painter.layout(
+        text,
+        egui::FontId::monospace(11.0),
+        if budget_exceeded {
+            ui.visuals().warn_fg_color
+        } else {
+            Color32::from_rgb(160, 230, 160)
+        },
+        rect.width() - 16.0,
+    );
+    let bg = egui::Rect::from_min_size(anchor, galley.size()).expand(6.0);
+    painter.rect_filled(bg, 4.0, Color32::from_black_alpha(190));
+    painter.galley(anchor, galley, Color32::WHITE);
 }
 
 /// Suggestions section (kept out of `panels` because it needs app state).

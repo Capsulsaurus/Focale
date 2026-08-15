@@ -7,10 +7,27 @@ Owning code: `focale-core/src/decode`. Governing invariants: `[HARD-DET]`,
 - **Decode crate** (`v1 (shipped)`): `rawshift-image` with `arw` + `dng` features
   (the crate's two "stabilizing" formats). Supported today: Sony
   lossless-compressed ARW (compression type 7 — A7 IV / A7R V / A1 generation
-  bodies) and DNG. Uncompressed and lossy ARW decode will arrive upstream; we
-  surface a clear per-file error until then (`v1 (gap, issue #12)`). Initial
-  camera support target: Sony ARW first-class; other makes as the decode crate
+  bodies) and DNG. Uncompressed (type 1) and lossy (type 8) ARW decode is
+  tracked in rawshift as
+  [#64](https://github.com/visualcommons/rawshift/issues/64); we surface a
+  clear per-file error until it lands (`v1 (gap, issue #12)`). Initial camera
+  support target: Sony ARW first-class; other makes as the decode crate
   allows.
+
+  **Note on "upstream".** rawshift is a sibling project by the same author,
+  not a third party, so the two gaps Focale waits on
+  ([#63](https://github.com/visualcommons/rawshift/issues/63) optics metadata,
+  [#64](https://github.com/visualcommons/rawshift/issues/64) compression) are
+  scheduling questions rather than external dependencies. Both issues were
+  filed 2026-08-15; before that, docs described these as blocked upstream
+  while **nothing upstream tracked them** — the wait had no other end than
+  someone writing it down.
+
+  Also note the dependency is pinned to the published `rawshift-image` 0.1.1,
+  while rawshift `master` has since split into per-format crates
+  (`rawshift-image-arw` and siblings) over a `gamut-*` foundation. Adopting
+  either fix means moving to that newer shape, which is more than a version
+  bump.
 - **Path:** `decode_raw()` (u16 CFA) → black-level subtract → demosaic →
   normalize `u16 / white_level` to **linear camera RGB f32**.
 - **Demosaic is pinned per pipeline version** to `Bayer(Amaze)` — never `Auto`,

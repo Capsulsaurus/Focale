@@ -66,12 +66,12 @@ Known v1 gaps, all sub-issues of #1:
 
 | Gap | Issue | Nature |
 | --- | --- | --- |
-| Optical-correction math | #7 | Unbuilt; the parameter model and stage behaviour are specified normatively in [optics](subsystems/optics.md). |
+| Optical-correction math | #7 | Unbuilt; the parameter model and stage behaviour are specified normatively in [optics](subsystems/optics.md). Needs a metadata source first — rawshift [#63](https://github.com/visualcommons/rawshift/issues/63). |
 | Wide-gamut display output | #6 (Wayland), #10 (macOS) | One capability, two platform halves. The wgpu ≥ 30 wait ended with the eframe 0.36 bump; what remains is that `egui-wgpu` exposes no surface `color_space` hook, after which #6 wires the Wayland side and #10 the macOS side ([color](subsystems/color.md)). |
-| Uncompressed / lossy ARW decode | #12 | Blocked upstream on the decode crate; affected files fail with a clear per-file error ([decode](subsystems/decode.md)). |
+| Uncompressed / lossy ARW decode | #12 | Waiting on rawshift [#64](https://github.com/visualcommons/rawshift/issues/64) — a sibling project, not a third party; affected files fail with a clear per-file error meanwhile ([decode](subsystems/decode.md)). |
 | Multi-person parsing | #8 | Model-capability limit, not an implementation limit — the schema already expresses it ([masks](subsystems/masks.md)). |
 | Sclera / iris separation | #9 | Model-capability limit, as above. |
-| Preview benchmark & instrumentation | #11 | The < 100 ms target is an unmeasured budget ([preview](subsystems/preview.md)). |
+| Preview latency below the < 100 ms target | *(follow-up to #11)* | Measured 2026-08-14: a rich edit costs 2.4×–5.2× the budget. Instrumentation and the benchmark shipped with #11; closing the gap is per-stage caching in the preview scheduler ([verification](verification.md#preview-latency-measured)). |
 | macOS build, colour-space tagging & CI | #10 | A first-class target with no CI and no platform-specific code; the same issue covers its half of wide-gamut output ([verification](verification.md)). |
 | 20-in-30 validation run | #1 | The acceptance bar above, not yet run end-to-end. |
 

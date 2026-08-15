@@ -10,6 +10,7 @@ pub mod masks;
 pub mod math;
 pub mod params;
 pub mod pipeline;
+pub mod preview;
 
 /// The current pipeline version.
 ///
