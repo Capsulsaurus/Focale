@@ -84,24 +84,22 @@ Per-platform reality:
   and Mesa's X11 WSI exposes only sRGB; the `x11` cargo feature exists solely so
   the binary can compile there (not targeted, not recommended, sRGB forever —
   [platform](platform.md)).
-- **Blocker (status verified 2026-07-20, changing):** released `egui-wgpu`
-  0.35.0 (2026-06-25) depends on `wgpu ^29`, which predates the colour-space
-  API — so the *released* stack cannot reach it. But egui PR
-  [#8289](https://github.com/emilk/egui/pull/8289) ("Upgrade wgpu to v30")
-  **merged to `main` on 2026-07-20**, so the fix exists upstream and is
-  awaiting a release. Tracking issue
-  [#8312](https://github.com/emilk/egui/issues/8312) remains open. Past
-  release cadence (0.33.0 2025-10-09, 0.34.0 2026-03-26, 0.35.0 2026-06-25)
-  is roughly quarterly, which would put 0.36 around Sept–Oct 2026 — an
-  **extrapolation, not an announced date**; no maintainer has stated one.
-  - **The pin cannot be routed around by dropping eframe.**
-    `egui_wgpu::Renderer::new` takes `wgpu` types by reference, so the caller's
-    `wgpu` must be the same semver-major as `egui-wgpu`'s. The pin lives in
-    `egui-wgpu`, not `eframe`. The only way to have this before 0.36 is a git
-    dependency on egui `main`.
-  - Neither issue #6 nor #10 tracks the egui upgrade itself — they track the
-    two platform halves that consume it ([scope](../scope.md)). The upstream
-    bump has no Focale issue because it is not Focale work.
+- **Blocker (updated 2026-08-14 — the wgpu half cleared, a new one replaced
+  it).** The previously recorded blocker was that released `egui-wgpu` 0.35.0
+  depended on `wgpu ^29`, predating the colour-space API. **egui/eframe 0.36.1
+  shipped on 2026-08-07 against `wgpu ^30`, and Focale is now on it** — that
+  extrapolated "Sept–Oct 2026" wait did not happen and the prediction is
+  retired.
+  - **What blocks #6/#10 now:** `egui_wgpu::SurfaceConfig` exposes only
+    `present_mode` and `desired_maximum_frame_latency`, and
+    `Painter::configure_surface` fills the rest of `wgpu::SurfaceConfiguration`
+    from `surface.get_default_config(…)`. There is no hook for `color_space`,
+    so the field exists in our dependency graph but is unreachable through
+    egui's API (verified by reading `egui-wgpu` 0.36.1 sources, not its docs).
+  - The surface belongs to `egui-wgpu`'s `Painter`, which does not expose it,
+    so Focale cannot reconfigure it after the fact either.
+  - Neither issue #6 nor #10 tracks the egui work itself — they track the two
+    platform halves that consume it ([scope](../scope.md)).
 - Integration note for when it lands: one surface has one colour space, so
   when the surface is not sRGB, egui chrome (authored in sRGB) must be
   converted to the surface space in the render pass — chrome needs no colour
