@@ -67,7 +67,7 @@ Known v1 gaps, all sub-issues of #1:
 | Gap | Issue | Nature |
 | --- | --- | --- |
 | Optical-correction math | #7 | Unbuilt; the parameter model and stage behaviour are specified normatively in [optics](subsystems/optics.md). Needs a metadata source first — rawshift [#63](https://github.com/visualcommons/rawshift/issues/63). |
-| Wide-gamut display output | #6 (Wayland), #10 (macOS) | One capability, one blocker, two platform halves: both wait on egui/eframe moving to wgpu ≥ 30, then #6 wires the Wayland surface colour space and #10 the macOS side ([color](subsystems/color.md)). |
+| Wide-gamut display output | #6 (Wayland), #10 (macOS) | One capability, two platform halves. The wgpu ≥ 30 wait ended with the eframe 0.36 bump; what remains is that `egui-wgpu` exposes no surface `color_space` hook, after which #6 wires the Wayland side and #10 the macOS side ([color](subsystems/color.md)). |
 | Uncompressed / lossy ARW decode | #12 | Waiting on rawshift [#64](https://github.com/visualcommons/rawshift/issues/64) — a sibling project, not a third party; affected files fail with a clear per-file error meanwhile ([decode](subsystems/decode.md)). |
 | Multi-person parsing | #8 | Model-capability limit, not an implementation limit — the schema already expresses it ([masks](subsystems/masks.md)). |
 | Sclera / iris separation | #9 | Model-capability limit, as above. |

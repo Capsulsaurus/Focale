@@ -14,7 +14,7 @@ and no platform-specific code yet — `v1 (gap, issue #10)`.
 
 ## GUI stack
 
-`eframe` (currently 0.35 = `winit` 0.30 + `wgpu` 29 + `egui` 0.35). Rationale:
+`eframe` (currently 0.36 = `winit` 0.30 + `wgpu` 30 + `egui` 0.36). Rationale:
 the image viewport must be a custom colour-managed render pass under our control
 ([color](color.md)), which rules out webview stacks; egui rides the same wgpu
 surface for panels and keeps the whole app in Rust. UI chrome does not require
@@ -22,8 +22,10 @@ colour precision; the viewport shader does.
 
 **Colour-management capability per target:** owned by the capability matrix in
 [color](color.md#wide-gamut-display-capability-matrix) — summary: wide-gamut
-display output is supportable on macOS (Metal) and Linux/**Wayland** (pending the
-stack's move to wgpu ≥ 30); Linux/X11 is incapable, permanently.
+display output is supportable on macOS (Metal) and Linux/**Wayland**; Linux/X11
+is incapable, permanently. The stack reached wgpu ≥ 30 with the 0.36 bump, so
+that half of the wait is over — see the matrix for what still blocks issues
+#6/#10.
 
 ## Performance target
 

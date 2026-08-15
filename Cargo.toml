@@ -18,7 +18,7 @@ focale-sidecar = { path = "crates/focale-sidecar" }
 
 avif-serialize = "0.8"
 ciborium = "0.2"
-eframe = { version = "0.35", default-features = false, features = [
+eframe = { version = "0.36", default-features = false, features = [
     "default_fonts",
     "wayland",
     "wgpu",
