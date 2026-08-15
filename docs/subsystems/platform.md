@@ -29,7 +29,15 @@ stack's move to wgpu ≥ 30); Linux/X11 is incapable, permanently.
 
 Slider-to-screen update < 100 ms at fit-to-window zoom on a base Apple-silicon
 Mac; full-resolution CPU export may be slower — correct beats fast on the export
-path. (Unmeasured; `v1 (gap, issue #11)` — [preview](preview.md).)
+path.
+
+**Measured 2026-08-14 and not met**: a rich edit costs 234–480 ms in the CPU
+pipeline alone, 2.4×–5.2× the budget, before any GPU work
+([verification](../verification.md#preview-latency-measured) has the numbers,
+the method, and the reproduction command). The target stands as a target; the
+work to reach it is per-stage caching in the preview scheduler
+([preview](preview.md)). Apple-silicon numbers wait on issue #10 — the figures
+above are the Linux reference machine.
 
 ## Distribution & packaging
 

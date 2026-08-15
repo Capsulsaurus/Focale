@@ -49,10 +49,67 @@ an oversight:
   written — "perceptually faithful" has no threshold — so closing this
   means first choosing one (e.g. a bounded ΔE over a fixture set), then
   testing against it.
-- **The < 100 ms preview budget** — a budget, never measured; instrumentation
-  and a reproducible benchmark are `v1 (gap, issue #11)`
-  ([preview](subsystems/preview.md)).
+- **The < 100 ms preview budget** — now measured, and **not met**; see
+  [Preview latency](#preview-latency-measured) below.
 - **Export-recipe validity rules** ([sidecar](subsystems/sidecar.md) §5.16)
   are enforced by the encoder at runtime, but no test asserts that every
   invalid combination is rejected — a third-party writer's expectations rest
   on prose alone today.
+
+## Preview latency (measured)
+
+The `< 100 ms` slider-to-screen target ([platform](subsystems/platform.md)) is
+**not met**. Recorded here rather than in an issue comment because it falsifies
+a claim the architecture doc used to make, and future work needs the baseline.
+
+**How to reproduce.** `focale-cli bench-preview` measures the CPU pipeline on
+the preview base — the same `focale_core::preview::render` the app runs, so the
+benchmark and the app cannot drift apart:
+
+```bash
+cargo build --release -p focale-cli
+# Largest preview base, no raw file needed (deterministic synthetic image):
+./target/release/focale-cli bench-preview \
+    --sidecar crates/focale-cli/tests/fixtures/determinism.fcl --runs 12
+# Against a real raw, with a per-stage attribution:
+./target/release/focale-cli bench-preview <raw.arw> \
+    --sidecar crates/focale-cli/tests/fixtures/determinism.fcl --breakdown
+```
+
+The rich edit is the committed `determinism.fcl` fixture: a local mask, a clone
+stroke, unsharp + noise reduction, grading, crop, grain and vignette.
+
+**Reference machine (Linux, 2026-08-14):** AMD Ryzen 7 7800X3D (8C/16T),
+Fedora Silverblue 44, `rustc` 1.97.0, release profile. Apple-silicon numbers
+wait on issue #10.
+
+| Preview base | Edit | min | median |
+| --- | --- | --- | --- |
+| 2064×1376 (Sony ILCE-6700, 6192×4128 → ÷3) | rich | 234 ms | 244 ms |
+| 2064×1376 | default (empty) | 63 ms | 66 ms |
+| 2560×1707 (`PREVIEW_LONG_EDGE`, synthetic) | rich | 480 ms | 517 ms |
+
+**Reading:** a rich edit is **2.4×–5.2× over budget** on the CPU stage alone,
+before the scheduler queue, the GPU upload, or the present that the in-app
+instrumentation also counts. Even an *empty* edit spends two-thirds of the
+budget. The pipeline is already parallel (~620 % CPU observed), so this is not
+an un-threaded-code problem.
+
+**Where the time goes.** `--breakdown` disables one stage at a time and reports
+the saving. Across repeated runs the ranking is stable — **tone (stage 4) and
+detail (stage 7) dominate, followed by local (stage 6)**; geometry, finishing
+and retouch sit at or below the measurement floor. Those first three are what a
+per-stage cache would need to cover.
+
+**A caveat on method, since these numbers will be re-run.** The benchmark
+compares configurations on *minima* (noise is additive, so the fastest run is
+the cleanest estimate) and interleaves variants with a rotating order, because
+a fixed order gives later variants a systematically worse slot. It also times a
+**control** — an unmodified copy of the edit, whose saving is zero by
+construction — and prints whatever that reads as the run's noise floor, marking
+unresolved rows. On a busy workstation the floor reached 59 ms and individual
+stage figures were meaningless while the headline stayed stable; **check the
+reported noise floor before believing a per-stage number.**
+
+**Follow-up:** per-stage caching in the preview scheduler — the seam
+[preview](subsystems/preview.md) named in advance for exactly this outcome.

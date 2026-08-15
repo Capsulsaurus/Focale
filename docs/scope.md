@@ -71,7 +71,7 @@ Known v1 gaps, all sub-issues of #1:
 | Uncompressed / lossy ARW decode | #12 | Blocked upstream on the decode crate; affected files fail with a clear per-file error ([decode](subsystems/decode.md)). |
 | Multi-person parsing | #8 | Model-capability limit, not an implementation limit — the schema already expresses it ([masks](subsystems/masks.md)). |
 | Sclera / iris separation | #9 | Model-capability limit, as above. |
-| Preview benchmark & instrumentation | #11 | The < 100 ms target is an unmeasured budget ([preview](subsystems/preview.md)). |
+| Preview latency below the < 100 ms target | *(follow-up to #11)* | Measured 2026-08-14: a rich edit costs 2.4×–5.2× the budget. Instrumentation and the benchmark shipped with #11; closing the gap is per-stage caching in the preview scheduler ([verification](verification.md#preview-latency-measured)). |
 | macOS build, colour-space tagging & CI | #10 | A first-class target with no CI and no platform-specific code; the same issue covers its half of wide-gamut output ([verification](verification.md)). |
 | 20-in-30 validation run | #1 | The acceptance bar above, not yet run end-to-end. |
 

@@ -38,7 +38,7 @@ areas; it becomes normative by graduating into a subsystem doc.
 | `focale-export` | Output transform and export encoders. | [export](subsystems/export.md) |
 | `focale-segment` | ONNX segmentation (ort). Used only at mask-creation time; never on the export path. | [masks](subsystems/masks.md), [rnd/inference](rnd/inference.md) |
 | `focale-buildinfo` | Build provenance strings (release version + git short hash, platform name) for the writing binaries; keeps the deterministic-path crates free of build scripts. | [sidecar](subsystems/sidecar.md) §5.1 |
-| `focale-cli` | Headless export binary. The reference deterministic path; CI runs it on x86_64 + aarch64 and diffs bytes. | [verification](verification.md) |
+| `focale-cli` | Headless export binary. The reference deterministic path; CI runs it on x86_64 + aarch64 and diffs bytes. Also hosts `bench-preview`, the offline preview-latency benchmark. | [verification](verification.md) |
 | `focale-app` | Desktop GUI (eframe = winit + wgpu + egui). Depends on core/sidecar/segment/export/buildinfo. | [app](subsystems/app.md), [preview](subsystems/preview.md), [platform](subsystems/platform.md) |
 
 **Rationale for the split:** the export path must be testable headless on CI
