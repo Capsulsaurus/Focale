@@ -4,7 +4,7 @@ mod app;
 mod export_queue;
 mod jobs;
 mod panels;
-mod preview;
+mod perf;
 mod session;
 mod suggest;
 mod thumbs;

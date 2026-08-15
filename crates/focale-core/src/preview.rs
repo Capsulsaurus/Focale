@@ -1,22 +1,30 @@
-//! Preview rendering: decode caching, downscaling, pipeline runs.
+//! Preview base construction and rendering (docs/subsystems/preview.md).
 //!
-//! Strategy (docs/subsystems/preview.md): decode once per image, immediately
-//! box-downscale to a preview base (long edge ≤ [`PREVIEW_LONG_EDGE`]) and
-//! drop the full-resolution buffer; every slider change re-runs the CPU
-//! pipeline on the preview base (stage caching arrives with profiling data;
-//! the base is small enough that a full re-run meets the latency budget).
-//! The GPU only performs the colour-managed display transform.
+//! Strategy: decode once per image, immediately box-downscale to a preview
+//! base (long edge ≤ [`PREVIEW_LONG_EDGE`]) and render every interactive
+//! edit on that base. Preview runs the *export* pipeline — what the viewport
+//! shows is the exported file at a different scale, never an approximation
+//! of it — so this module lives beside the pipeline rather than in the GUI
+//! crate. `focale-app` drives it interactively and `focale-cli
+//! bench-preview` measures it; both therefore exercise one implementation
+//! (issue #11).
+//!
+//! Nothing here is on the export path, so it carries no `[HARD-DET]`
+//! obligation of its own. It is deterministic anyway: [`build_base`] is a
+//! fixed-order integer box filter, and [`render`] is the ordinary pipeline.
 
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use focale_core::decode::{DecodeError, DecodedRaw};
-use focale_core::image::ImageRgbF32;
-use focale_core::params::EditState;
-use focale_core::pipeline::{self, RenderInput, RenderWarning};
+use crate::decode::{DecodeError, DecodedRaw};
+use crate::image::ImageRgbF32;
+use crate::params::EditState;
+use crate::pipeline::{self, RenderInput, RenderWarning};
 
-/// Preview base resolution (long edge, px). ~2560 keeps a full pipeline run
-/// well under the 100 ms slider-to-screen budget on the reference machine.
+/// Preview base resolution (long edge, px).
+///
+/// The interactive latency budget is measured at this size
+/// (docs/subsystems/platform.md; numbers in docs/verification.md).
 pub const PREVIEW_LONG_EDGE: u32 = 2560;
 
 /// A decoded-and-downscaled image cached for interactive editing.
@@ -26,11 +34,11 @@ pub struct PreviewBase {
     pub path: PathBuf,
     /// Downscaled linear camera RGB (plus metadata) for pipeline input.
     pub decoded: Arc<DecodedRaw>,
-    /// Ratio of preview resolution to native (RenderInput::scale).
+    /// Ratio of preview resolution to native ([`RenderInput::scale`]).
     pub scale: f32,
 }
 
-/// Result of a preview render job.
+/// Result of a preview render.
 pub struct PreviewFrame {
     /// Rendered working-space image (linear Rec.2020).
     pub image: ImageRgbF32,
@@ -42,7 +50,16 @@ pub struct PreviewFrame {
 
 /// Decodes `path` and builds the preview base.
 pub fn build_base(path: &std::path::Path) -> Result<PreviewBase, DecodeError> {
-    let full = focale_core::decode::decode_file(path)?;
+    let full = crate::decode::decode_file(path)?;
+    Ok(base_from_decoded(path.to_path_buf(), full))
+}
+
+/// Builds a preview base from an already-decoded raw, downscaling when it
+/// exceeds [`PREVIEW_LONG_EDGE`].
+///
+/// Split out from [`build_base`] so callers that synthesize or reuse a
+/// decode (the benchmark) share the exact downscale the app performs.
+pub fn base_from_decoded(path: PathBuf, full: DecodedRaw) -> PreviewBase {
     let long_edge = full.width.max(full.height);
     let (decoded, scale) = if long_edge <= PREVIEW_LONG_EDGE {
         (full, 1.0)
@@ -52,11 +69,11 @@ pub fn build_base(path: &std::path::Path) -> Result<PreviewBase, DecodeError> {
         let scale = 1.0 / factor as f32;
         (scaled, scale)
     };
-    Ok(PreviewBase {
-        path: path.to_path_buf(),
+    PreviewBase {
+        path,
         decoded: Arc::new(decoded),
         scale,
-    })
+    }
 }
 
 /// Integer box-filter downscale of the decoded raw by `factor` (average of
@@ -123,7 +140,24 @@ pub fn render(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use focale_core::decode::RawMetadata;
+    use crate::decode::RawMetadata;
+
+    fn metadata() -> RawMetadata {
+        RawMetadata {
+            camera_make: None,
+            camera_model: None,
+            as_shot_neutral: None,
+            xyz_to_camera: None,
+            orientation: 1,
+            capture_time: None,
+            iso: None,
+            exposure_time: None,
+            f_number: None,
+            focal_length: None,
+            lens_model: None,
+            optics: Default::default(),
+        }
+    }
 
     #[test]
     fn downscale_box_averages_blocks() {
@@ -131,25 +165,39 @@ mod tests {
             width: 4,
             height: 2,
             pixels: (0..24).map(|i| i as f32).collect(),
-            metadata: RawMetadata {
-                camera_make: None,
-                camera_model: None,
-                as_shot_neutral: None,
-                xyz_to_camera: None,
-                orientation: 1,
-                capture_time: None,
-                iso: None,
-                exposure_time: None,
-                f_number: None,
-                focal_length: None,
-                lens_model: None,
-                optics: Default::default(),
-            },
+            metadata: metadata(),
         };
         let out = downscale_box(&decoded, 2);
         assert_eq!((out.width, out.height), (2, 1));
         // Block (0,0): pixels 0 and 1 of rows 0/1 → r = mean(0, 3, 12, 15).
         assert_eq!(out.pixels[0], (0.0 + 3.0 + 12.0 + 15.0) / 4.0);
+    }
+
+    #[test]
+    fn base_from_decoded_downscales_past_the_long_edge() {
+        let w = PREVIEW_LONG_EDGE * 2 + 1;
+        let decoded = DecodedRaw {
+            width: w,
+            height: 4,
+            pixels: vec![0.25; w as usize * 4 * 3],
+            metadata: metadata(),
+        };
+        let base = base_from_decoded(PathBuf::from("big.arw"), decoded);
+        assert!(base.decoded.width <= PREVIEW_LONG_EDGE);
+        assert_eq!(base.scale, 1.0 / 3.0);
+    }
+
+    #[test]
+    fn base_from_decoded_leaves_small_images_alone() {
+        let decoded = DecodedRaw {
+            width: 64,
+            height: 32,
+            pixels: vec![0.25; 64 * 32 * 3],
+            metadata: metadata(),
+        };
+        let base = base_from_decoded(PathBuf::from("small.arw"), decoded);
+        assert_eq!((base.decoded.width, base.decoded.height), (64, 32));
+        assert_eq!(base.scale, 1.0);
     }
 
     fn tiny_base() -> PreviewBase {
@@ -159,20 +207,7 @@ mod tests {
                 width: 2,
                 height: 2,
                 pixels: vec![0.5; 12],
-                metadata: RawMetadata {
-                    camera_make: None,
-                    camera_model: None,
-                    as_shot_neutral: None,
-                    xyz_to_camera: None,
-                    orientation: 1,
-                    capture_time: None,
-                    iso: None,
-                    exposure_time: None,
-                    f_number: None,
-                    focal_length: None,
-                    lens_model: None,
-                    optics: Default::default(),
-                },
+                metadata: metadata(),
             }),
             scale: 1.0,
         }
@@ -182,13 +217,13 @@ mod tests {
     fn render_dispatches_stored_version() {
         let base = tiny_base();
         let edit = EditState::default();
-        assert!(render(&base, &edit, focale_core::PIPELINE_VERSION, 0).is_ok());
+        assert!(render(&base, &edit, crate::PIPELINE_VERSION, 0).is_ok());
     }
 
     #[test]
     fn render_future_version_errors_not_panics() {
         let base = tiny_base();
         let edit = EditState::default();
-        assert!(render(&base, &edit, focale_core::PIPELINE_VERSION + 1, 0).is_err());
+        assert!(render(&base, &edit, crate::PIPELINE_VERSION + 1, 0).is_err());
     }
 }
