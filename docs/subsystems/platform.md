@@ -95,13 +95,21 @@ travels with every artifact), no store may inject networking/telemetry
   Settings → Privacy & Security → Open Anyway, and macOS 26 often shows a
   misleading "app is damaged" dialog instead.
 
-  This makes Developer ID signing + notarization (**$99/yr**) a decision the
-  project must take before September 2026, not an optional polish item.
-  Unsigned-viable alternatives if that fee is declined: **MacPorts** (no
-  notability bar, source-built, signing irrelevant — the best fit for an AGPL
-  Rust workspace), Nix/nix-darwin, a self-hosted tap (document the
-  fully-qualified `brew install --cask Capsulsaurus/focale/focale` to sidestep
-  Homebrew 6.0.0 Tap Trust), or a direct DMG with documented `xattr` removal.
+  This made Developer ID signing + notarization (**$99/yr**) a decision the
+  project had to take before September 2026, not an optional polish item.
+  **Decided 2026-08-15: signing and notarization are covered** — the
+  maintainer holds the Apple Developer enrolment, so the DMG is signed and
+  notarized in CI and the cask is viable. The unsigned-viable fallbacks
+  (MacPorts, Nix/nix-darwin, a self-hosted tap, a direct DMG with documented
+  `xattr` removal) are recorded above only so the reasoning survives; none is
+  the plan.
+
+  Release CI therefore needs Apple credentials as repository secrets. They are
+  added by the maintainer and never handled by tooling or contributors:
+  `MACOS_CERTIFICATE` (base64 of the Developer ID Application `.p12`),
+  `MACOS_CERT_PASSWORD`, `APPLE_TEAM_ID`, and an App Store Connect API key
+  (`APPLE_API_KEY_ID`, `APPLE_API_ISSUER`, `APPLE_API_KEY`) for
+  `notarytool`.
 
   Rejected: Mac App Store — sandbox entitlements fight the
   arbitrary-directory session model, and store terms sit uneasily with AGPL.

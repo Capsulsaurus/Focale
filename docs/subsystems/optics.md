@@ -16,11 +16,15 @@ consumes — never restates — the contract defined here.
 - v1 source is exclusively embedded metadata (**HARD**). If metadata is absent
   and nothing can be inferred, the stage emits a visible warning in the UI and is
   skipped — **never guess, never fail**.
-- Reality of the v1 decode stack: rawshift 0.1.1 parses **no** optics metadata
-  from ARW (the correction arrays sit in SubIFD tags it does not decode — see
-  the parameter model below) and only DNG `GainMap` opcodes on its internal
-  DNG path. Consequently the stage emits the mandated
-  visible warning ("no optics metadata; stage skipped") for affected files.
+- Reality of the v1 decode stack: rawshift parses **no** optics metadata from
+  ARW (the correction arrays sit in SubIFD tags it does not decode — see the
+  parameter model below) and only DNG `GainMap` opcodes on its internal DNG
+  path. Consequently the stage emits the mandated visible warning ("no optics
+  metadata; stage skipped") for affected files. Tracked upstream as rawshift
+  [#63](https://github.com/visualcommons/rawshift/issues/63), which carries
+  the tag list, the layout traps and the fixture values; that issue is the
+  gate on issue #7 and confirmed still absent on rawshift `master`
+  (2026-08-15).
 - Shipped seam (`v1 (shipped)`): the `OpticsMetadata` presence struct
   (`focale-core/src/decode`), the `OpticsParams` stage toggles (inert until
   metadata exists), and the warning plumbing through to the status bar

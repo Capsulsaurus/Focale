@@ -52,13 +52,21 @@
 //! # Optics correction metadata (docs/subsystems/optics.md)
 //!
 //! The optics stage (docs/subsystems/optics.md) sources corrections exclusively from embedded
-//! metadata. rawshift 0.1.1 parses **no** optics metadata from ARW (Sony
-//! stores it in undecoded MakerNote tags) and applies DNG `GainMap` opcodes
-//! only on its internal LinearRaw path, which we do not use. Consequently
-//! [`OpticsMetadata`] reports all sources absent (`false`) in v1, and the
-//! optics stage emits its mandated (docs/subsystems/optics.md) "no optics metadata; stage skipped"
-//! warning. The struct exists so presence is reported honestly per file the
-//! moment upstream parsing lands.
+//! metadata. rawshift parses **no** optics metadata from ARW and applies DNG
+//! `GainMap` opcodes only on its internal LinearRaw path, which we do not
+//! use. Consequently [`OpticsMetadata`] reports all sources absent (`false`)
+//! in v1, and the optics stage emits its mandated (docs/subsystems/optics.md)
+//! "no optics metadata; stage skipped" warning. The struct exists so presence
+//! is reported honestly per file the moment upstream parsing lands
+//! (rawshift issue
+//! [#63](https://github.com/visualcommons/rawshift/issues/63)).
+//!
+//! **Correction:** an earlier version of this comment said Sony "stores it in
+//! undecoded MakerNote tags". The arrays Focale needs are **EXIF SubIFD**
+//! tags `0x7032`/`0x7035`/`0x7037`, read as `Exif.SubImage1.*`. Sony's
+//! MakerNotes carry a *separate* copy without the leading count element, so
+//! the two have different indexing and must not be conflated —
+//! docs/subsystems/optics.md has the layout in full.
 //!
 //! # Colour matrix
 //!
