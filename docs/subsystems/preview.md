@@ -1,9 +1,10 @@
 # Preview & compute scheduling
 
 How interactive preview stays faithful to the deterministic CPU pipeline, and how
-background work is prioritized. Owning code: `focale-app` (`preview`, `jobs`,
-`suggest`, `thumbs`). Governing invariants: `[HARD-DET]`
-([invariants](../invariants.md)).
+background work is prioritized. Owning code: `focale-core` (`preview` — base
+construction and render, shared with `focale-cli bench-preview`) and
+`focale-app` (`jobs`, `perf`, `suggest`, `thumbs`). Governing invariants:
+`[HARD-DET]` ([invariants](../invariants.md)).
 
 ## One implementation of the pipeline math
 
@@ -31,11 +32,29 @@ a different scale, not an approximation of it.
 
 **Rationale:** the GPU preview must stay perceptually faithful to the CPU path
 forever, across every pipeline version. Duplicating eleven stages in WGSL doubles
-every algorithm and every version freeze. **Honesty note:** the <100 ms
-slider-to-screen figure ([platform](platform.md) targets) is a *budget, not a
-measurement* — no benchmark exists yet; instrumentation and a reproducible
-benchmark are `v1 (gap, issue #11)`. If profiling falsifies the single-pipeline
-design, the seam is the preview scheduler, not the stage code.
+every algorithm and every version freeze.
+
+**Measured, and the budget is missed** (2026-08-14, issue #11). The <100 ms
+slider-to-screen figure ([platform](platform.md) targets) was a *budget, not a
+measurement*; it is now measured, and a rich edit costs 234–480 ms in the CPU
+pipeline alone — numbers, method and reproduction in
+[verification](../verification.md#preview-latency-measured). Two consequences,
+both of which this document called in advance:
+
+- **The seam is the preview scheduler, not the stage code**, exactly as the
+  previous wording predicted. The fix is per-stage caching: re-running eleven
+  stages for a one-slider change is the waste, and tone (stage 4), detail
+  (stage 7) and local (stage 6) are where the time goes.
+- **The single-pipeline design is not falsified by this.** Preview renders the
+  export pipeline because correctness demands it; the measurement says that
+  pipeline needs caching, not that preview should grow a second
+  implementation in WGSL.
+
+Instrumentation ships in both places it is needed: `focale-app`'s `perf` module
+measures the live slider-to-screen path (F12 overlay, or the `focale_app::perf`
+tracing target), and `focale-cli bench-preview` reproduces the CPU half
+offline. Both call the same `focale_core::preview::render`, so they cannot
+drift from what the app does.
 
 ## Job scheduler
 
