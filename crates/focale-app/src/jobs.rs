@@ -124,6 +124,23 @@ impl Scheduler {
         cvar.notify_one();
         JobHandle { cancelled }
     }
+
+    /// Stops the worker threads.
+    ///
+    /// `shutdown` existed but was never written to, so the workers parked on
+    /// the condvar for the life of the process. Called from
+    /// `eframe::App::on_exit`. Jobs already running finish; queued jobs are
+    /// dropped, which is correct for previews and thumbnails and is why
+    /// `on_exit` flushes sidecars *before* calling this.
+    pub fn shutdown(&self) {
+        let (lock, cvar) = &*self.inner;
+        {
+            let mut state = lock.lock().unwrap();
+            state.shutdown = true;
+            state.queue.clear();
+        }
+        cvar.notify_all();
+    }
 }
 
 fn worker_loop(inner: Arc<(Mutex<SchedulerState>, Condvar)>) {
@@ -167,6 +184,40 @@ mod tests {
     use std::time::Duration;
 
     #[test]
+    fn shutdown_drops_queued_work_and_stops_workers() {
+        let s = Scheduler::new(1);
+        let (tx, rx) = channel();
+        // Hold the only worker so the jobs behind it stay queued.
+        let gate = Arc::new((Mutex::new(false), Condvar::new()));
+        let g = gate.clone();
+        s.submit(Priority::Preview, move || {
+            let (l, c) = &*g;
+            let mut open = l.lock().unwrap();
+            while !*open {
+                open = c.wait(open).unwrap();
+            }
+        });
+        for _ in 0..4 {
+            let t = tx.clone();
+            s.submit(Priority::Preview, move || {
+                let _ = t.send("ran");
+            });
+        }
+        drop(tx);
+
+        s.shutdown();
+        {
+            let (l, c) = &*gate;
+            *l.lock().unwrap() = true;
+            c.notify_all();
+        }
+
+        // The queued jobs were dropped, so nothing else reports in and the
+        // channel closes once the worker exits.
+        assert!(rx.recv_timeout(Duration::from_secs(2)).is_err());
+    }
+
+    #[test]
     fn priority_orders_work() {
         let s = Scheduler::new(1);
         let (tx, rx) = channel();
@@ -201,17 +252,48 @@ mod tests {
     fn idle_waits_for_quiet() {
         let s = Scheduler::new(2);
         let (tx, rx) = channel();
-        let t1 = tx.clone();
-        s.submit(Priority::Idle, move || {
-            let _ = t1.send("idle");
-        });
-        let t2 = tx.clone();
+
+        // The non-idle job must be in flight *before* the idle job is
+        // submitted, otherwise a worker may legitimately run the idle job
+        // while the queue is genuinely quiet — which is the scheduler
+        // behaving correctly, not the invariant under test. Gating on a
+        // condvar rather than sleeping makes that ordering guaranteed instead
+        // of merely likely.
+        let gate = Arc::new((Mutex::new(false), Condvar::new()));
+        let g = gate.clone();
+        let t_thumb = tx.clone();
         s.submit(Priority::Thumbnail, move || {
-            std::thread::sleep(Duration::from_millis(50));
-            let _ = t2.send("thumb");
+            let (l, c) = &*g;
+            let mut open = l.lock().unwrap();
+            while !*open {
+                open = c.wait(open).unwrap();
+            }
+            drop(open);
+            let _ = t_thumb.send("thumb");
         });
-        // Idle must not run before the thumbnail finishes even with a free
-        // worker available.
+
+        // Wait until the thumbnail job is actually running, so `busy_non_idle`
+        // is non-zero no matter how the workers were scheduled.
+        while s.inner.0.lock().unwrap().busy_non_idle == 0 {
+            std::thread::yield_now();
+        }
+
+        let t_idle = tx.clone();
+        s.submit(Priority::Idle, move || {
+            let _ = t_idle.send("idle");
+        });
+
+        // A worker is free, but idle work must still wait for the thumbnail.
+        assert!(
+            rx.recv_timeout(Duration::from_millis(100)).is_err(),
+            "idle work ran while a non-idle job was in flight"
+        );
+
+        {
+            let (l, c) = &*gate;
+            *l.lock().unwrap() = true;
+            c.notify_all();
+        }
         assert_eq!(rx.recv_timeout(Duration::from_secs(5)).unwrap(), "thumb");
         assert_eq!(rx.recv_timeout(Duration::from_secs(5)).unwrap(), "idle");
     }

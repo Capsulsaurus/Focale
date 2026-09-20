@@ -3,6 +3,7 @@
 mod app;
 mod export_queue;
 mod jobs;
+mod notices;
 mod panels;
 mod perf;
 mod session;

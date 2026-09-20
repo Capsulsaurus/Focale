@@ -15,12 +15,17 @@ use focale_sidecar::{SidecarDoc, SidecarError};
 
 use crate::export_queue::{self, ExportItem, ExportStatus};
 use crate::jobs::{JobHandle, Priority, Scheduler};
+use crate::notices::{Notices, Severity};
 use crate::panels;
 use crate::perf::{PerfStats, RenderTiming};
 use crate::session::Session;
 use crate::suggest::{self, SuggestionSet};
 use crate::thumbs;
 use crate::viewport::{self, ViewportCallback, ViewportRenderer};
+
+/// How long a non-error notice holds the status bar before it reverts to
+/// showing pipeline warnings. Errors are not aged out (`Notices::current`).
+const NOTICE_TTL: Duration = Duration::from_secs(8);
 
 /// Worker → UI messages.
 enum Msg {
@@ -76,6 +81,14 @@ pub struct FocaleApp {
     /// Sidecars that exist on disk but failed to load (e.g. written by a
     /// newer schema). Never saved, so Focale cannot clobber a newer file.
     unloadable: HashSet<PathBuf>,
+    /// Per-file load failures, keyed by raw path, shown as a filmstrip badge
+    /// and in the panel when that file is primary. Derived state: cleared on
+    /// re-open and rebuilt from whatever fails again.
+    load_errors: HashMap<PathBuf, String>,
+    /// Everything the user needs to be told (see `crate::notices`).
+    notices: Notices,
+    /// Whether the notice history popup is open.
+    show_notices: bool,
 
     /// Filmstrip thumbnails.
     thumbs: HashMap<PathBuf, TextureHandle>,
@@ -145,6 +158,9 @@ impl FocaleApp {
             warnings: Vec::new(),
             render_error: None,
             unloadable: HashSet::new(),
+            load_errors: HashMap::new(),
+            notices: Notices::default(),
+            show_notices: false,
             thumbs: HashMap::new(),
             thumbs_requested: HashSet::new(),
             gamut: Gamut::Srgb,
@@ -179,12 +195,15 @@ impl FocaleApp {
                 self.frame = None;
                 self.render_error = None;
                 self.unloadable.clear();
+                self.load_errors.clear();
                 self.thumbs.clear();
                 self.thumbs_requested.clear();
                 self.request_primary_preview();
             }
             Err(e) => {
                 tracing::error!("failed to open directory: {e}");
+                self.notices
+                    .error(format!("Could not open {}: {e}", dir.display()));
             }
         }
     }
@@ -207,6 +226,13 @@ impl FocaleApp {
                          the file on disk will not be overwritten",
                         sidecar.display()
                     );
+                    // Raised here rather than in `flush_dirty` so it is said
+                    // once per file instead of on every debounce tick.
+                    self.notices.error(format!(
+                        "{}: existing sidecar could not be read ({e}). Edits will NOT be \
+                         saved for this image — the file on disk is left untouched.",
+                        file_label(path)
+                    ));
                     self.unloadable.insert(path.to_path_buf());
                     SidecarDoc::new_default(focale_core::PIPELINE_VERSION)
                 }
@@ -326,6 +352,11 @@ impl FocaleApp {
                     "not saving {}: its on-disk sidecar failed to load and must not be clobbered",
                     path.display()
                 );
+                self.notices.warn(format!(
+                    "{}: edits not saved — the existing sidecar could not be read and \
+                     will not be overwritten.",
+                    file_label(&path)
+                ));
                 continue;
             }
             // Keep live-index in sync with session state before saving.
@@ -341,6 +372,10 @@ impl FocaleApp {
             let sidecar = focale_sidecar::sidecar_path_for(&path);
             if let Err(e) = doc.save(&sidecar) {
                 tracing::error!("sidecar save failed for {}: {e}", sidecar.display());
+                self.notices.error(format!(
+                    "{}: could not save edits ({e}). Your changes are in memory only.",
+                    file_label(&path)
+                ));
             }
         }
     }
@@ -424,6 +459,7 @@ impl FocaleApp {
             match msg {
                 Msg::Base(path, Ok(base)) => {
                     self.decoding.remove(&path);
+                    self.load_errors.remove(&path);
                     self.bases.insert(path.clone(), base.clone());
                     self.base_order.push(path.clone());
                     if self.base_order.len() > 8 {
@@ -439,8 +475,15 @@ impl FocaleApp {
                 Msg::Base(path, Err(e)) => {
                     self.decoding.remove(&path);
                     tracing::error!("decode failed for {}: {e}", path.display());
-                    self.warnings.clear();
-                    self.frame = None;
+                    self.notices.error(format!("{}: {e}", file_label(&path)));
+                    self.load_errors.insert(path.clone(), e);
+                    // Only the primary owns the viewport. A background decode
+                    // failing for some other entry must not blank the image
+                    // the user is actually looking at.
+                    if Some(&path) == self.primary_path().as_ref() {
+                        self.warnings.clear();
+                        self.frame = None;
+                    }
                 }
                 Msg::Frame(path, Ok(f), timing) => {
                     if Some(&path) == self.primary_path().as_ref()
@@ -459,6 +502,8 @@ impl FocaleApp {
                 Msg::Frame(path, Err(e), _) => {
                     if Some(&path) == self.primary_path().as_ref() {
                         tracing::error!("render failed for {}: {e}", path.display());
+                        self.notices
+                            .error(format!("{}: render failed ({e})", file_label(&path)));
                         self.warnings.clear();
                         self.frame = None;
                         self.render_error = Some(e);
@@ -473,6 +518,18 @@ impl FocaleApp {
                     self.thumbs.insert(path, handle);
                 }
                 Msg::Export(index, status) => {
+                    match (&status, self.exports.get(index)) {
+                        (ExportStatus::Failed(e), Some(item)) => {
+                            let label = file_label(&item.source);
+                            self.notices.error(format!("{label}: export failed ({e})"));
+                        }
+                        (ExportStatus::Done(out), Some(item)) => {
+                            let label = file_label(&item.source);
+                            self.notices
+                                .info(format!("{label} exported to {}", out.display()));
+                        }
+                        _ => {}
+                    }
                     if let Some(item) = self.exports.get_mut(index) {
                         item.status = status;
                     }
@@ -484,7 +541,10 @@ impl FocaleApp {
                             Ok(mask) => {
                                 self.push_mask(focale_core::masks::MaskShape::AiResolved(mask));
                             }
-                            Err(e) => tracing::error!("segmentation failed: {e}"),
+                            Err(e) => {
+                                tracing::error!("segmentation failed: {e}");
+                                self.notices.error(format!("AI mask failed: {e}"));
+                            }
                         }
                     }
                 }
@@ -495,6 +555,33 @@ impl FocaleApp {
                 }
             }
         }
+    }
+
+    /// Keeps the GPU texture in step with the CPU frame.
+    ///
+    /// `self.frame = None` is set from many places — selection change, decode
+    /// failure, render failure, directory open — and on its own it only
+    /// clears the CPU copy. `upload_image` was the sole writer of the
+    /// viewport texture and nothing ever cleared it, so the previously
+    /// selected image kept being painted under the new file's name. One sync
+    /// point here means every path that drops the frame also drops the
+    /// texture, rather than each caller having to remember.
+    fn sync_viewport(&mut self, frame: &eframe::Frame) {
+        if self.frame.is_some() {
+            return;
+        }
+        self.clear_viewport_image(frame);
+    }
+
+    fn clear_viewport_image(&mut self, frame: &eframe::Frame) {
+        let Some(rs) = frame.wgpu_render_state() else {
+            return;
+        };
+        let mut renderer = rs.renderer.write();
+        if let Some(vp) = renderer.callback_resources.get_mut::<ViewportRenderer>() {
+            vp.clear_image();
+        }
+        self.frame_uploaded = 0;
     }
 
     /// Uploads the rendered frame to the GPU. Returns whether the upload
@@ -555,6 +642,7 @@ impl eframe::App for FocaleApp {
             self.perf.overlay = !self.perf.overlay;
         }
         self.handle_messages(&ctx, frame);
+        self.sync_viewport(frame);
         self.request_thumbnails();
 
         // ---- Top bar ----
@@ -622,7 +710,27 @@ impl eframe::App for FocaleApp {
         // ---- Status bar (docs/subsystems/app.md HARD: persistent keyed fields) ----
         egui::Panel::bottom("status").show(root, |ui| {
             ui.horizontal(|ui| {
-                ui.label(RichText::new(format!("Gamut: {}", self.gamut.display_name())).strong());
+                // docs/subsystems/color.md (HARD): the key reports what is
+                // really being shown, never what was requested. The selection
+                // is a preference; while the surface is sRGB, a wider
+                // selection is a gamut the image is mapped *through*, not a
+                // gamut the display is showing.
+                let shown = viewport::DISPLAY_GAMUT;
+                if self.gamut == shown {
+                    ui.label(RichText::new(format!("Gamut: {}", shown.display_name())).strong());
+                } else {
+                    ui.label(
+                        RichText::new(format!("Gamut: {}", shown.display_name()))
+                            .strong()
+                            .color(ui.visuals().warn_fg_color),
+                    )
+                    .on_hover_text(format!(
+                        "{} is selected, but this display surface is {}, so that is what you \
+                         are seeing. Wide-gamut output is not yet wired (issues #6 / #10).",
+                        self.gamut.display_name(),
+                        shown.display_name()
+                    ));
+                }
                 ui.separator();
                 let pv = self
                     .primary_path()
@@ -657,8 +765,19 @@ impl eframe::App for FocaleApp {
                 };
                 ui.label(format!("Zoom: {zoom_label}"));
                 ui.separator();
+                let notice = self
+                    .notices
+                    .current(NOTICE_TTL)
+                    .map(|n| (n.severity, n.severity.glyph(), n.text.clone()));
                 if let Some(err) = &self.render_error {
                     ui.colored_label(ui.visuals().error_fg_color, format!("✘ {err}"));
+                } else if let Some((severity, glyph, text)) = notice {
+                    let colour = match severity {
+                        Severity::Error => ui.visuals().error_fg_color,
+                        Severity::Warning => ui.visuals().warn_fg_color,
+                        Severity::Info => ui.visuals().text_color(),
+                    };
+                    ui.colored_label(colour, format!("{glyph} {text}"));
                 } else {
                     let warn = panels::warning_text(&self.warnings);
                     if warn.is_empty() {
@@ -667,8 +786,47 @@ impl eframe::App for FocaleApp {
                         ui.colored_label(ui.visuals().warn_fg_color, format!("⚠ {warn}"));
                     }
                 }
+                if !self.notices.is_empty() {
+                    ui.separator();
+                    let label = format!("Messages ({})", self.notices.len());
+                    if ui.small_button(label).clicked() {
+                        self.show_notices = !self.show_notices;
+                    }
+                }
             });
         });
+
+        // ---- Message history ----
+        if self.show_notices {
+            let mut open = true;
+            egui::Window::new("Messages")
+                .open(&mut open)
+                .default_width(520.0)
+                .show(&ctx, |ui| {
+                    if ui.button("Clear").clicked() {
+                        self.notices.clear();
+                    }
+                    ui.separator();
+                    egui::ScrollArea::vertical()
+                        .max_height(320.0)
+                        .show(ui, |ui| {
+                            // Newest first: the thing that just went wrong is the
+                            // thing being looked for.
+                            for n in self.notices.iter().rev() {
+                                let colour = match n.severity {
+                                    Severity::Error => ui.visuals().error_fg_color,
+                                    Severity::Warning => ui.visuals().warn_fg_color,
+                                    Severity::Info => ui.visuals().text_color(),
+                                };
+                                ui.colored_label(
+                                    colour,
+                                    format!("{} {}", n.severity.glyph(), n.text),
+                                );
+                            }
+                        });
+                });
+            self.show_notices = open;
+        }
 
         // ---- Filmstrip ----
         egui::Panel::bottom("filmstrip")
@@ -692,6 +850,7 @@ impl eframe::App for FocaleApp {
                                 } else {
                                     ui.visuals().widgets.noninteractive.bg_stroke
                                 };
+                                let failed = self.load_errors.get(&entry.path);
                                 if let Some(tex) = self.thumbs.get(&entry.path) {
                                     egui::Image::new(tex).paint_at(ui, rect);
                                 } else {
@@ -701,14 +860,32 @@ impl eframe::App for FocaleApp {
                                         ui.visuals().extreme_bg_color,
                                     );
                                 }
+                                // A file Focale cannot read must not look
+                                // identical to one whose thumbnail has simply
+                                // not arrived yet.
+                                if failed.is_some() {
+                                    ui.painter().text(
+                                        rect.center(),
+                                        egui::Align2::CENTER_CENTER,
+                                        "✘",
+                                        egui::FontId::proportional(20.0),
+                                        ui.visuals().error_fg_color,
+                                    );
+                                }
                                 ui.painter().rect_stroke(
                                     rect,
                                     2.0,
                                     stroke,
                                     egui::StrokeKind::Inside,
                                 );
+                                if let Some(err) = failed {
+                                    resp.clone().on_hover_text(err);
+                                }
                                 if resp.clicked() {
-                                    clicked = Some((i, ui.input(|s| s.modifiers.ctrl)));
+                                    // `command` is Cmd on macOS and Ctrl
+                                    // elsewhere; `ctrl` would make
+                                    // multi-select impossible on a Mac.
+                                    clicked = Some((i, ui.input(|s| s.modifiers.command)));
                                 }
                                 let flag = match entry.live.flag {
                                     Flag::Pick => "⚑",
@@ -739,9 +916,35 @@ impl eframe::App for FocaleApp {
             .show(root, |ui| {
                 egui::ScrollArea::vertical().show(ui, |ui| {
                     let Some(path) = self.primary_path() else {
-                        ui.label("Open a directory to begin.");
+                        // A folder full of CR2/NEF used to look exactly like
+                        // no folder at all. Say which it is.
+                        match &self.session.dir {
+                            None => {
+                                ui.label("Open a directory to begin.");
+                            }
+                            Some(dir) => {
+                                ui.label(
+                                    RichText::new("No supported images in this folder.").strong(),
+                                );
+                                ui.label(format!("{}", dir.display()));
+                                ui.separator();
+                                ui.label(
+                                    "Focale v1 reads Sony lossless-compressed ARW and Bayer \
+                                     DNG. Other formats track the rawshift decode crate \
+                                     (issue #12).",
+                                );
+                            }
+                        }
                         return;
                     };
+                    if let Some(err) = self.load_errors.get(&path) {
+                        ui.colored_label(
+                            ui.visuals().error_fg_color,
+                            RichText::new(format!("✘ {}", file_label(&path))).strong(),
+                        );
+                        ui.label(err.clone());
+                        ui.separator();
+                    }
                     // Rating / flags for the primary image.
                     if let Some(idx) = self.session.primary {
                         let mut live_changed = false;
@@ -856,7 +1059,10 @@ impl eframe::App for FocaleApp {
     }
 
     fn on_exit(&mut self) {
+        // Order matters: persist every pending edit first, then stop the
+        // workers. Sidecars are the user's data; queued previews are not.
         self.flush_dirty(true);
+        self.scheduler.shutdown();
     }
 }
 
@@ -1323,38 +1529,44 @@ impl FocaleApp {
     }
 
     fn keyboard(&mut self, ctx: &egui::Context) {
-        let Some(idx) = self.session.primary else {
+        // Culling keys are bare letters and digits. If a text widget has
+        // focus, typing "5" into it must not also rate the image.
+        if ctx.egui_wants_keyboard_input() {
             return;
-        };
+        }
         let mut live_changed = false;
-        ctx.input(|i| {
-            let entry = &mut self.session.entries[idx];
-            for (key, rating) in [
-                (Key::Num0, 0u8),
-                (Key::Num1, 1),
-                (Key::Num2, 2),
-                (Key::Num3, 3),
-                (Key::Num4, 4),
-                (Key::Num5, 5),
-            ] {
-                if i.key_pressed(key) {
-                    entry.live.rating = rating;
+        // Rating/flag keys need a primary; arrow navigation deliberately does
+        // not, so it is handled below regardless.
+        if let Some(idx) = self.session.primary {
+            ctx.input(|i| {
+                let entry = &mut self.session.entries[idx];
+                for (key, rating) in [
+                    (Key::Num0, 0u8),
+                    (Key::Num1, 1),
+                    (Key::Num2, 2),
+                    (Key::Num3, 3),
+                    (Key::Num4, 4),
+                    (Key::Num5, 5),
+                ] {
+                    if i.key_pressed(key) {
+                        entry.live.rating = rating;
+                        live_changed = true;
+                    }
+                }
+                if i.key_pressed(Key::P) {
+                    entry.live.flag = Flag::Pick;
                     live_changed = true;
                 }
-            }
-            if i.key_pressed(Key::P) {
-                entry.live.flag = Flag::Pick;
-                live_changed = true;
-            }
-            if i.key_pressed(Key::X) {
-                entry.live.flag = Flag::Reject;
-                live_changed = true;
-            }
-            if i.key_pressed(Key::U) {
-                entry.live.flag = Flag::None;
-                live_changed = true;
-            }
-        });
+                if i.key_pressed(Key::X) {
+                    entry.live.flag = Flag::Reject;
+                    live_changed = true;
+                }
+                if i.key_pressed(Key::U) {
+                    entry.live.flag = Flag::None;
+                    live_changed = true;
+                }
+            });
+        }
         if live_changed && let Some(path) = self.primary_path() {
             self.dirty.insert(path, Instant::now());
         }
@@ -1367,11 +1579,12 @@ impl FocaleApp {
         if left || right {
             let len = self.session.entries.len();
             if len > 0 {
-                let cur = self.session.primary.unwrap_or(0);
-                let next = if right {
-                    (cur + 1).min(len - 1)
-                } else {
-                    cur.saturating_sub(1)
+                // With nothing selected yet, either arrow adopts the first
+                // entry rather than stepping past it.
+                let (cur, next) = match self.session.primary {
+                    None => (usize::MAX, 0),
+                    Some(cur) if right => (cur, (cur + 1).min(len - 1)),
+                    Some(cur) => (cur, cur.saturating_sub(1)),
                 };
                 if next != cur {
                     self.flush_dirty(true);
@@ -1384,6 +1597,15 @@ impl FocaleApp {
     }
 }
 
+/// Short, user-facing name for a path: the file name where there is one,
+/// else the full path. Notices address the user, who thinks in file names,
+/// not in absolute paths.
+fn file_label(path: &std::path::Path) -> String {
+    path.file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_else(|| path.display().to_string())
+}
+
 /// A queued segmentation request.
 #[derive(Debug, Clone, Copy)]
 enum SegmentRequest {
@@ -1393,4 +1615,40 @@ enum SegmentRequest {
     Person,
     Part(focale_core::masks::PersonPart),
     Object([f32; 2]),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn file_label_prefers_the_file_name() {
+        assert_eq!(
+            file_label(std::path::Path::new("/photos/shoot/IMG_2533.DNG")),
+            "IMG_2533.DNG"
+        );
+    }
+
+    #[test]
+    fn file_label_falls_back_to_the_whole_path() {
+        // A path ending in `..` has no file name; the label must still say
+        // something rather than being empty.
+        assert_eq!(file_label(std::path::Path::new("..")), "..");
+    }
+
+    /// The status bar must not claim to be showing a gamut the surface cannot
+    /// present (`docs/subsystems/color.md`, HARD). v1 surfaces are sRGB, so a
+    /// wider selection has to read as a mismatch.
+    #[test]
+    fn display_gamut_is_the_reported_one() {
+        assert_eq!(viewport::DISPLAY_GAMUT, Gamut::Srgb);
+        for g in Gamut::ALL {
+            let honest = g == viewport::DISPLAY_GAMUT;
+            assert_eq!(
+                honest,
+                g == Gamut::Srgb,
+                "only the surface gamut may be reported without a mismatch marker"
+            );
+        }
+    }
 }

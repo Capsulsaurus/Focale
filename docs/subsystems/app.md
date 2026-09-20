@@ -163,6 +163,21 @@ operation that re-stamps a sidecar's version, [sidecar](sidecar.md) §3.3), imag
 colour info under cursor, zoom, and warnings (e.g. missing optics metadata,
 [optics](optics.md)).
 
+## Failures are told to the user, not only to the log
+
+Every failure the application can hit reaches the user. A failure that only
+reaches `tracing` has not been handled — the load-bearing case is a sidecar
+that cannot be written, where logging alone loses the user's edits silently.
+
+Notices carry a severity (info / warning / error), appear in the status bar,
+and accumulate in a bounded, dismissable history. Consecutive duplicates
+collapse, so a failure that repeats every frame reads as one ongoing problem.
+Errors hold the status bar until superseded; lower severities age out.
+Per-file failures additionally mark the file in the directory view, so an
+image Focale cannot read never looks like one whose thumbnail simply has not
+arrived yet. Notices are derived in-memory state: never persisted, never an
+authority (`[HARD-FS]`).
+
 ## AI-suggestion hook
 
 v1 ships no suggestion model, but the UI and compute scheduler implement the
