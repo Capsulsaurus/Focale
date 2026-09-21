@@ -6,9 +6,6 @@
 [tools]
 # Keep the version in sync with the `amends` URL at the top of hk.pkl.
 hk = "2.0.1"
-# convco publishes no x86_64-apple-darwin binary, so it goes through the cargo
-# backend: binstall grabs the prebuilt release where one exists (Linux, Apple
-# Silicon, Windows) and falls back to a source build rather than hard-failing.
 cargo-binstall = "1.23.0"
 "cargo:convco" = "0.7.2"
 
@@ -38,9 +35,6 @@ run = "cargo run -p focale-app --"
 
 [tasks.check]
 description = "Everything CI runs"
-# Sequential, like the justfile recipe this replaces: the three gates contend on
-# cargo's target lock, so running them together buys nothing and interleaves the
-# output. CI still runs them as independent parallel jobs.
 run = [
   "mise run fmt-check",
   "mise run lint",
