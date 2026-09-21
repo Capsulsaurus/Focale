@@ -43,6 +43,14 @@ rfd = "0.15"
 serde = { version = "1", features = ["derive"] }
 sha2 = "0.10"
 zune-jpeg = "0.5"
+
+# Input ICC handling for embedded previews (colour-managed thumbnails and the
+# view-only path). BSD-3-Clause OR Apache-2.0, plus num-traits (MIT/Apache-2.0)
+# and pxfm (BSD-3-Clause/Apache-2.0) — all AGPL-compatible ([HARD-LICENSE]).
+# Deliberately a `focale-app` dependency only: it is display-side and must
+# never reach the deterministic export path, which generates its own output
+# profiles in `focale-export::icc`.
+moxcms = "0.9"
 thiserror = "2"
 tiff = "0.11"
 tracing = "0.1"

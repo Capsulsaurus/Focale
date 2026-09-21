@@ -4,7 +4,7 @@
 
 use std::path::PathBuf;
 
-use focale_core::decode::{DecodeError, decode_file, extract_thumbnail, is_raw_candidate};
+use focale_core::decode::{DecodeError, decode_file, embedded_preview, is_raw_candidate};
 use sha2::{Digest, Sha256};
 
 /// SHA-256 of the decoded f32 pixel buffer (little-endian bytes) for the
@@ -126,8 +126,8 @@ fn extracts_fixture_metadata() {
 fn fixture_has_no_embedded_thumbnail() {
     // The synthetic fixture carries no JPEG preview; the call must succeed
     // and report that, not error.
-    let thumb = extract_thumbnail(&fixture()).expect("thumbnail extraction must not fail");
-    assert_eq!(thumb, None);
+    let thumb = embedded_preview(&fixture()).expect("preview extraction must not fail");
+    assert!(thumb.is_none());
 }
 
 #[test]
@@ -157,4 +157,32 @@ fn non_raw_bytes_are_unsupported_format() {
 fn raw_candidate_matches_fixture() {
     assert!(is_raw_candidate(&fixture()));
     assert!(!is_raw_candidate(&fixture().with_extension("fcl")));
+}
+
+/// A file with no embedded preview must report absence, not fail. The
+/// synthetic fixture is a bare 64×48 Bayer DNG with no preview IFD, so it is
+/// exactly the "nothing to find" case.
+#[test]
+fn preview_extraction_reports_absence_without_erroring() {
+    let path = fixture();
+    let found = focale_core::decode::preview::extract_preview(&path)
+        .expect("a readable DNG must not error while looking for a preview");
+    assert!(found.is_none(), "synthetic.dng carries no embedded preview");
+}
+
+/// Preview extraction must never decode raw pixels, so it has to work on
+/// files `decode_file` rejects outright. Guarded here with a non-raw file:
+/// it is not a TIFF at all, so the answer is an error or `None` — never a
+/// panic, and never a hang.
+#[test]
+fn preview_extraction_declines_non_tiff_input() {
+    let mut path = std::env::temp_dir();
+    path.push(format!("focale-not-a-tiff-{}.dng", std::process::id()));
+    std::fs::write(&path, b"this is not a TIFF file at all").unwrap();
+    let result = focale_core::decode::preview::extract_preview(&path);
+    let _ = std::fs::remove_file(&path);
+    match result {
+        Ok(None) | Err(_) => {}
+        Ok(Some(_)) => panic!("found a preview in a file that has none"),
+    }
 }

@@ -80,6 +80,8 @@
 //! as-is (`ColorMatrix2`, conventionally the D65 calibration, is preferred
 //! when interpolation inputs are missing).
 
+pub mod preview;
+
 use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
@@ -245,14 +247,35 @@ pub fn decode_file(path: &Path) -> Result<DecodedRaw, DecodeError> {
     })
 }
 
-/// Extracts the embedded JPEG thumbnail, if the file carries one.
+/// Extracts the largest embedded JPEG preview, if the file carries one.
 ///
-/// Returns `Ok(None)` when the format has no embedded thumbnail (or rawshift
-/// does not extract it yet). The bytes are the JPEG stream exactly as stored.
-pub fn extract_thumbnail(path: &Path) -> Result<Option<Vec<u8>>, DecodeError> {
+/// Returns `Ok(None)` when the file has no embedded preview.
+///
+/// Tries [`preview::extract_preview`] first, which understands both the
+/// TIFF/EP thumbnail tags and DNG's strip-based preview IFDs, then falls back
+/// to rawshift's own extractor for formats whose previews live somewhere this
+/// module does not look (Sony's larger preview in MakerNote, for instance).
+///
+/// Neither path decodes raw pixel data, so this works on files
+/// [`decode_file`] cannot develop — which is the point: a directory stays
+/// browsable and cullable regardless of how far decode support has got.
+pub fn embedded_preview(path: &Path) -> Result<Option<preview::EmbeddedPreview>, DecodeError> {
+    if let Ok(Some(found)) = preview::extract_preview(path) {
+        return Ok(Some(found));
+    }
     let file = File::open(path)?;
     let mut raw = RawFile::open(BufReader::new(file)).map_err(open_error)?;
-    raw.thumbnail().map_err(decode_error)
+    Ok(raw
+        .thumbnail()
+        .map_err(decode_error)?
+        .map(|jpeg| preview::EmbeddedPreview {
+            jpeg,
+            width: None,
+            height: None,
+            // rawshift does not report orientation alongside the thumbnail;
+            // the display side treats `None` as "leave it alone".
+            orientation: None,
+        }))
 }
 
 /// Returns true when `path` has a raw extension this module can try to
