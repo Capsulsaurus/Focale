@@ -66,3 +66,45 @@ Owning code: `focale-core/src/decode`. Governing invariants: `[HARD-DET]`,
 - **Optics metadata** parsed (or not) at decode time is the input to the optical
   corrections stage; the presence struct and its limits are specified in
   [optics](optics.md).
+
+## Embedded previews (`v1 (shipped)`)
+
+Owning code: `focale-core/src/decode/preview.rs`. **Off the deterministic
+export path** — a preview is the camera's rendering, not Focale's, so it never
+feeds an export.
+
+Previews exist so a directory is browsable and cullable regardless of how far
+raw decode support has got. A file whose raw payload Focale cannot develop
+still shows, still rates, still flags.
+
+Two conventions are read, because which one a file uses depends on who wrote
+it:
+
+- **TIFF/EP thumbnail tags** — `JPEGInterchangeFormat` / `-Length`
+  (0x0201 / 0x0202).
+- **Strip-based preview IFDs** — a full IFD with `Compression = 7` (JPEG)
+  whose bitstream is located by `StripOffsets` / `StripByteCounts`
+  (0x0111 / 0x0117). This is what modern DNG writers use, Apple ProRAW
+  included.
+
+The largest preview found wins. rawshift 0.1.1 reads only the first
+convention, which is why every strip-based file reported "no thumbnail" while
+carrying a multi-megapixel JPEG; its extractor is kept as a fallback for
+formats whose previews live somewhere this reader does not look.
+
+Previews are stored in sensor orientation, so IFD0's `Orientation` is returned
+alongside and applied before display — without it, a portrait frame shows on
+its side.
+
+**Colour.** A preview carries its own ICC profile and must be converted, not
+assumed. Apple writes Display P3; treating those bytes as sRGB shows every
+thumbnail oversaturated and makes the filmstrip disagree with the viewport
+rendering the same file. Conversion happens in `focale-app/src/thumbs.rs`
+against the same display gamut the viewport shader uses. An untagged preview
+is assumed sRGB; a profile that cannot be parsed falls back to sRGB rather
+than dropping the image.
+
+**Size.** An embedded preview can be full-resolution — 8064×6048 in the
+corpus this was built against, ~145 MB of RGB once decoded — so thumbnail
+decodes are bounded in flight and ordered nearest-first, and thumbnail
+textures are evicted by distance from the open image.

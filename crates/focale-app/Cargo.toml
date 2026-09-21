@@ -16,6 +16,7 @@ focale-sidecar.workspace = true
 
 eframe.workspace = true
 half.workspace = true
+moxcms.workspace = true
 rfd.workspace = true
 tracing.workspace = true
 zune-jpeg.workspace = true

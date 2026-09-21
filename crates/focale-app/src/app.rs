@@ -23,6 +23,17 @@ use crate::suggest::{self, SuggestionSet};
 use crate::thumbs;
 use crate::viewport::{self, ViewportCallback, ViewportRenderer};
 
+/// Long edge of a decoded thumbnail, in pixels.
+const THUMBNAIL_LONG_EDGE: usize = 256;
+
+/// Thumbnail decodes allowed in flight at once. See `request_thumbnails` for
+/// why this is bounded rather than left to the worker count.
+const MAX_THUMBNAIL_DECODES: usize = 3;
+
+/// Thumbnail textures kept resident. Roughly a screenful of grid tiles plus
+/// margin; beyond this, the ones furthest from the primary are dropped.
+const MAX_THUMBNAIL_TEXTURES: usize = 300;
+
 /// How long a non-error notice holds the status bar before it reverts to
 /// showing pipeline warnings. Errors are not aged out (`Notices::current`).
 const NOTICE_TTL: Duration = Duration::from_secs(8);
@@ -32,7 +43,7 @@ enum Msg {
     Base(PathBuf, Result<PreviewBase, String>),
     AiMask(PathBuf, Result<focale_core::masks::ResolvedMask, String>),
     Frame(PathBuf, Result<Box<PreviewFrame>, String>, RenderTiming),
-    Thumb(PathBuf, ColorImage),
+    Thumb(PathBuf, Option<ColorImage>),
     Export(usize, ExportStatus),
     Suggest(PathBuf, SuggestionSet),
 }
@@ -93,6 +104,13 @@ pub struct FocaleApp {
     /// Filmstrip thumbnails.
     thumbs: HashMap<PathBuf, TextureHandle>,
     thumbs_requested: HashSet<PathBuf>,
+    /// Thumbnail jobs that have reported back, successfully or not. With
+    /// `thumbs_requested` this gives the in-flight count that bounds decode
+    /// concurrency.
+    thumbs_completed: usize,
+    /// Files that carry no embedded preview. Distinct from `load_errors`:
+    /// these files are not broken, they just have no thumbnail to show.
+    thumbs_missing: HashSet<PathBuf>,
 
     /// Active rendering gamut (status-bar key, docs/subsystems/color.md).
     gamut: Gamut,
@@ -163,6 +181,8 @@ impl FocaleApp {
             show_notices: false,
             thumbs: HashMap::new(),
             thumbs_requested: HashSet::new(),
+            thumbs_completed: 0,
+            thumbs_missing: HashSet::new(),
             gamut: Gamut::Srgb,
             tool: Tool::Pan,
             zoom: None,
@@ -198,6 +218,8 @@ impl FocaleApp {
                 self.load_errors.clear();
                 self.thumbs.clear();
                 self.thumbs_requested.clear();
+                self.thumbs_completed = 0;
+                self.thumbs_missing.clear();
                 self.request_primary_preview();
             }
             Err(e) => {
@@ -510,12 +532,25 @@ impl FocaleApp {
                     }
                 }
                 Msg::Thumb(path, image) => {
-                    let handle = ctx.load_texture(
-                        format!("thumb:{}", path.display()),
-                        image,
-                        Default::default(),
-                    );
-                    self.thumbs.insert(path, handle);
+                    self.thumbs_completed += 1;
+                    match image {
+                        Some(image) => {
+                            let handle = ctx.load_texture(
+                                format!("thumb:{}", path.display()),
+                                image,
+                                Default::default(),
+                            );
+                            self.thumbs.insert(path, handle);
+                        }
+                        None => {
+                            // No usable preview. This is *not* a load error:
+                            // the file may open and develop perfectly well and
+                            // simply carry no embedded JPEG. Tracked
+                            // separately so the tile reads "no preview" rather
+                            // than accusing the file of being broken.
+                            self.thumbs_missing.insert(path);
+                        }
+                    }
                 }
                 Msg::Export(index, status) => {
                     match (&status, self.exports.get(index)) {
@@ -607,25 +642,95 @@ impl FocaleApp {
         false
     }
 
+    /// Queues thumbnail decodes, nearest the primary first and only a few at
+    /// a time.
+    ///
+    /// Both limits are about memory, not politeness. An embedded preview is
+    /// whatever the camera chose to store, and phones store big ones — the
+    /// sample corpus this was built against carries a single 8064×6048 JPEG
+    /// per file, which is ~145 MB of RGB once decoded. Letting every worker
+    /// take one at once is well over a gigabyte of transient allocation for a
+    /// filmstrip. Bounded in flight, the peak is a few hundred megabytes.
+    ///
+    /// Ordering by distance from the primary means the tiles the user is
+    /// looking at resolve first, rather than whichever happened to sort first
+    /// by file name.
     fn request_thumbnails(&mut self) {
-        let paths: Vec<PathBuf> = self
+        let in_flight = self.thumbs_requested.len() - self.thumbs_completed;
+        if in_flight >= MAX_THUMBNAIL_DECODES {
+            return;
+        }
+        let budget = MAX_THUMBNAIL_DECODES - in_flight;
+        let anchor = self.session.primary.unwrap_or(0);
+
+        let mut pending: Vec<(usize, PathBuf)> = self
             .session
             .entries
             .iter()
-            .map(|e| e.path.clone())
-            .filter(|p| !self.thumbs.contains_key(p) && !self.thumbs_requested.contains(p))
-            .take(8)
+            .enumerate()
+            .filter(|(_, e)| {
+                !self.thumbs.contains_key(&e.path) && !self.thumbs_requested.contains(&e.path)
+            })
+            .map(|(i, e)| (i, e.path.clone()))
             .collect();
-        for path in paths {
+        pending.sort_by_key(|(i, _)| distance_from(*i, anchor));
+
+        for (_, path) in pending.into_iter().take(budget) {
             self.thumbs_requested.insert(path.clone());
             let tx = self.tx.clone();
             self.scheduler.submit(Priority::Thumbnail, move || {
-                if let Ok(Some(jpeg)) = focale_core::decode::extract_thumbnail(&path)
-                    && let Some(img) = thumbs::decode_thumbnail(&jpeg, 256)
-                {
-                    let _ = tx.send(Msg::Thumb(path, img));
-                }
+                let image = focale_core::decode::embedded_preview(&path)
+                    .ok()
+                    .flatten()
+                    .and_then(|pv| {
+                        thumbs::decode_thumbnail(
+                            &pv.jpeg,
+                            THUMBNAIL_LONG_EDGE,
+                            pv.orientation.unwrap_or(1),
+                        )
+                    });
+                // Always reply, even with nothing: the reply is what releases
+                // the in-flight slot, so a file with no usable preview must
+                // not stall the queue behind it.
+                let _ = tx.send(Msg::Thumb(path, image));
             });
+        }
+    }
+
+    /// Drops thumbnail textures far from the primary once the cache is over
+    /// budget, so browsing a large directory does not grow GPU memory without
+    /// bound. Textures are derived data and re-decode on demand.
+    fn evict_thumbnails(&mut self) {
+        if self.thumbs.len() <= MAX_THUMBNAIL_TEXTURES {
+            return;
+        }
+        let anchor = self.session.primary.unwrap_or(0);
+        let mut ranked: Vec<(usize, PathBuf)> = self
+            .session
+            .entries
+            .iter()
+            .enumerate()
+            .filter(|(_, e)| self.thumbs.contains_key(&e.path))
+            .map(|(i, e)| (distance_from(i, anchor), e.path.clone()))
+            .collect();
+        // Entries no longer in the session keep no texture at all.
+        let live: HashSet<&PathBuf> = ranked.iter().map(|(_, p)| p).collect();
+        let orphans: Vec<PathBuf> = self
+            .thumbs
+            .keys()
+            .filter(|p| !live.contains(p))
+            .cloned()
+            .collect();
+        for p in orphans {
+            self.thumbs.remove(&p);
+            self.thumbs_requested.remove(&p);
+        }
+        ranked.sort_by_key(|(d, _)| *d);
+        for (_, path) in ranked.into_iter().skip(MAX_THUMBNAIL_TEXTURES) {
+            self.thumbs.remove(&path);
+            // Allow a re-request when it comes back into view.
+            self.thumbs_requested.remove(&path);
+            self.thumbs_completed = self.thumbs_completed.saturating_sub(1);
         }
     }
 }
@@ -644,6 +749,7 @@ impl eframe::App for FocaleApp {
         self.handle_messages(&ctx, frame);
         self.sync_viewport(frame);
         self.request_thumbnails();
+        self.evict_thumbnails();
 
         // ---- Top bar ----
         egui::Panel::top("top").show(root, |ui| {
@@ -860,9 +966,8 @@ impl eframe::App for FocaleApp {
                                         ui.visuals().extreme_bg_color,
                                     );
                                 }
-                                // A file Focale cannot read must not look
-                                // identical to one whose thumbnail has simply
-                                // not arrived yet.
+                                // Three states must look different: broken,
+                                // no preview available, and not arrived yet.
                                 if failed.is_some() {
                                     ui.painter().text(
                                         rect.center(),
@@ -870,6 +975,14 @@ impl eframe::App for FocaleApp {
                                         "✘",
                                         egui::FontId::proportional(20.0),
                                         ui.visuals().error_fg_color,
+                                    );
+                                } else if self.thumbs_missing.contains(&entry.path) {
+                                    ui.painter().text(
+                                        rect.center(),
+                                        egui::Align2::CENTER_CENTER,
+                                        "no preview",
+                                        egui::FontId::proportional(11.0),
+                                        ui.visuals().weak_text_color(),
                                     );
                                 }
                                 ui.painter().rect_stroke(
@@ -1597,6 +1710,16 @@ impl FocaleApp {
     }
 }
 
+/// Absolute distance between two entry indices.
+///
+/// Thumbnail work is ordered by this so the tiles under the user's eyes
+/// resolve first, and eviction drops the ones furthest away. Computed on
+/// `usize` without casting through `isize`, which would be a silent wrap on a
+/// directory larger than `isize::MAX` and is needless besides.
+fn distance_from(index: usize, anchor: usize) -> usize {
+    index.abs_diff(anchor)
+}
+
 /// Short, user-facing name for a path: the file name where there is one,
 /// else the full path. Notices address the user, who thinks in file names,
 /// not in absolute paths.
@@ -1634,6 +1757,31 @@ mod tests {
         // A path ending in `..` has no file name; the label must still say
         // something rather than being empty.
         assert_eq!(file_label(std::path::Path::new("..")), "..");
+    }
+
+    #[test]
+    fn distance_is_symmetric_around_the_anchor() {
+        assert_eq!(distance_from(5, 5), 0);
+        assert_eq!(distance_from(7, 5), 2);
+        assert_eq!(distance_from(3, 5), 2);
+    }
+
+    #[test]
+    fn distance_does_not_wrap_on_large_indices() {
+        // The obvious `(a as isize - b as isize).abs()` wraps here.
+        assert_eq!(distance_from(0, usize::MAX), usize::MAX);
+    }
+
+    /// Thumbnail work is ordered by this, so the tiles the user is looking at
+    /// must come first regardless of file-name order.
+    #[test]
+    fn nearest_entries_sort_first() {
+        let anchor = 10usize;
+        let mut candidates: Vec<usize> = vec![0, 3, 9, 11, 14, 20];
+        candidates.sort_by_key(|i| distance_from(*i, anchor));
+        // Distances: 9→1, 11→1, 14→4, 3→7, then 0 and 20 tie at 10, where a
+        // stable sort keeps the original order.
+        assert_eq!(candidates, vec![9, 11, 14, 3, 0, 20]);
     }
 
     /// The status bar must not claim to be showing a gamut the surface cannot
