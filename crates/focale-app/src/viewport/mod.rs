@@ -17,6 +17,20 @@ use focale_core::color::oklab::{OKLAB_M1, OKLAB_M1_INV, OKLAB_M2, OKLAB_M2_INV};
 use focale_core::color::{Gamut, Mat3, REC2020_TO_XYZ, REINHARD_WHITE_DEFAULT, rec2020_to_gamut};
 
 /// Number of f32 words in the uniform block (8 mats × 12 + 4 + 4).
+/// The colour space the viewport surface is actually presented in.
+///
+/// v1 configures an sRGB swapchain and cannot do otherwise: `egui-wgpu` owns
+/// the `SurfaceConfiguration` and, as of 0.35, exposes no colour-space
+/// control (`docs/subsystems/color.md`, issues #6 / #10). This constant is
+/// the seam — when the surface can be queried, this becomes a value resolved
+/// from `SurfaceCapabilities::color_spaces` and nothing else here changes.
+///
+/// It is `pub` because the status bar must report *what is really being
+/// shown*, not what the user asked for. That honesty is a HARD requirement
+/// in `docs/subsystems/color.md`, and it can only be met if the UI and the
+/// shader read the same value.
+pub const DISPLAY_GAMUT: Gamut = Gamut::Srgb;
+
 const UNIFORM_WORDS: usize = 8 * 12 + 4 + 4;
 
 /// Shared GPU resources, stored in egui-wgpu's callback resources.
@@ -129,6 +143,14 @@ impl ViewportRenderer {
         }
     }
 
+    /// Drops the current image texture so nothing is painted until the next
+    /// upload. Without this the viewport keeps showing the previously
+    /// selected frame after a decode failure or a selection change — the
+    /// image would silently misrepresent which file is open.
+    pub fn clear_image(&mut self) {
+        self.image = None;
+    }
+
     /// Uploads working-space pixels (interleaved RGB f32 → RGBA f16) if
     /// `version` is newer than what the GPU holds.
     pub fn upload_image(
@@ -196,7 +218,7 @@ impl ViewportRenderer {
         let img = self.image.as_mut().expect("just created");
         if img.version != version {
             let mut halves: Vec<u16> = Vec::with_capacity(width as usize * height as usize * 4);
-            for px in rgb_f32.chunks_exact(3) {
+            for px in rgb_f32.as_chunks::<3>().0.iter() {
                 halves.push(half::f16::from_f32(px[0]).to_bits());
                 halves.push(half::f16::from_f32(px[1]).to_bits());
                 halves.push(half::f16::from_f32(px[2]).to_bits());
@@ -264,8 +286,9 @@ impl egui_wgpu::CallbackTrait for ViewportCallback {
         push_mat(&mut words, OKLAB_M2_INV);
         push_mat(&mut words, self.gamut.xyz_to_rgb());
         push_mat(&mut words, rec2020_to_gamut(self.gamut));
-        // Active gamut → display (v1: display = sRGB).
-        let target_to_display = Gamut::Srgb.xyz_to_rgb() * self.gamut.rgb_to_xyz();
+        // Active gamut → display. `DISPLAY_GAMUT` is the single place the
+        // surface's colour space is decided (see its docs).
+        let target_to_display = DISPLAY_GAMUT.xyz_to_rgb() * self.gamut.rgb_to_xyz();
         push_mat(&mut words, target_to_display);
         words.extend_from_slice(&self.uv_transform);
         words.extend_from_slice(&[

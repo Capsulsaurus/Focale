@@ -98,7 +98,7 @@ pub(crate) fn to_signal(
                 Gamut::Srgb | Gamut::DisplayP3 | Gamut::Rec2020 => srgb_encode,
                 Gamut::AdobeRgb => adobe_rgb_encode,
             };
-            for px in image.data().chunks_exact(3) {
+            for px in image.data().as_chunks::<3>().0.iter() {
                 let toned =
                     tonemap_reinhard_extended([px[0], px[1], px[2]], REINHARD_WHITE_DEFAULT);
                 let mapped = map_to_gamut(toned, gamut);
@@ -218,11 +218,11 @@ mod tests {
     #[test]
     fn resize_of_constant_image_is_constant() {
         let mut img = ImageRgbF32::new(8, 4);
-        for px in img.data_mut().chunks_exact_mut(3) {
+        for px in img.data_mut().as_chunks_mut::<3>().0.iter_mut() {
             px.copy_from_slice(&[0.25, 0.5, 0.75]);
         }
         let out = resize_long_edge(&img, Some(ResizeSpec { long_edge: 5 })).unwrap();
-        for px in out.data().chunks_exact(3) {
+        for px in out.data().as_chunks::<3>().0.iter() {
             assert_eq!(px, &[0.25, 0.5, 0.75]);
         }
     }

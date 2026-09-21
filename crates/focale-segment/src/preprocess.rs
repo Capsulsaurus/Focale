@@ -89,7 +89,7 @@ pub(crate) fn resample_to_srgb(image: &ImageRgbF32, tw: u32, th: u32) -> Vec<f32
 pub(crate) fn chw_normalized(srgb: &[f32], mean: [f32; 3], std: [f32; 3]) -> Vec<f32> {
     let pixels = srgb.len() / 3;
     let mut out = vec![0.0f32; srgb.len()];
-    for (i, px) in srgb.chunks_exact(3).enumerate() {
+    for (i, px) in srgb.as_chunks::<3>().0.iter().enumerate() {
         for c in 0..3 {
             out[c * pixels + i] = (px[c] - mean[c]) / std[c];
         }

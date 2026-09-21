@@ -39,6 +39,12 @@ f32, unbounded) is defined with the pipeline ([pipeline](pipeline.md)).
   key reports what is really being shown, not what was requested. The
   selection is a preference, never a claim; silently rendering P3 numbers into
   an sRGB surface would be the same lie in the other direction.
+  **Current reality:** the reporting half is `v1 (shipped)` — the key is driven
+  by `focale-app`'s `viewport::DISPLAY_GAMUT` (the single place the surface's
+  colour space is decided, sRGB in v1) and a wider selection is shown as an
+  explicit mismatch rather than as a claim. The *rendering* half — actually
+  configuring a wider surface — is still `v1 (gap, issues #6/#10)`, so today
+  the honest answer the key gives is always sRGB.
 
 ## Wide-gamut display capability matrix
 
