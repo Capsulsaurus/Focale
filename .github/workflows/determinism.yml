@@ -1,9 +1,13 @@
 name: Determinism
 
-# docs/verification.md: export the same (raw + sidecar) on two architectures and diff
-# bytes. Runs the full workspace test suite (golden-file and regression
-# tests) on both, then byte-hashes focale-cli renders of the committed
-# fixture in every export format and compares across architectures.
+# docs/verification.md: export the same (raw + sidecar) on two architectures and
+# diff bytes. Runs the full workspace test suite (golden-file and regression
+# tests) on both, then byte-hashes focale-cli renders of the committed fixture
+# in every export format and compares across architectures.
+#
+# Both steps are mise tasks from mise.toml; the render/hash step lives in
+# scripts/determinism-hashes.sh so it can be reproduced locally with
+# `mise run determinism`.
 
 on:
   push:
@@ -29,28 +33,15 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+      - uses: jdx/mise-action@v4
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
       - name: Workspace tests (golden + regression suites)
-        run: cargo test --workspace
+        run: mise run test
       - name: Render fixture in every format and hash
-        run: |
-          set -euo pipefail
-          RAW=crates/focale-core/tests/fixtures/synthetic.dng
-          SIDECAR=crates/focale-cli/tests/fixtures/determinism.fcl
-          OUT=hashes-${{ matrix.arch }}.txt
-          : > "$OUT"
-          echo "working $(cargo run -q -p focale-cli -- hash "$RAW" --sidecar "$SIDECAR")" >> "$OUT"
-          for fmt in tiff16 png16 png8 jpeg jxl avif; do
-            hash=$(cargo run -q -p focale-cli -- render "$RAW" --sidecar "$SIDECAR" \
-              --format "$fmt" --gamut display-p3 --hash --out "/tmp/out.$fmt")
-            echo "$fmt $hash" >> "$OUT"
-          done
-          hash=$(cargo run -q -p focale-cli -- render "$RAW" --sidecar "$SIDECAR" \
-            --format avif --gamut rec2020 --hdr pq --hash --out /tmp/out-hdr.avif)
-          echo "avif-hdr-pq $hash" >> "$OUT"
-          hash=$(cargo run -q -p focale-cli -- render "$RAW" --sidecar "$SIDECAR" \
-            --format jxl --gamut rec2020 --hdr hlg --hash --out /tmp/out-hdr.jxl)
-          echo "jxl-hdr-hlg $hash" >> "$OUT"
-          cat "$OUT"
+        run: mise run determinism
+        env:
+          HASHES_OUT: hashes-${{ matrix.arch }}.txt
       - uses: actions/upload-artifact@v4
         with:
           name: hashes-${{ matrix.arch }}
@@ -65,6 +56,9 @@ jobs:
         with:
           pattern: hashes-*
           merge-multiple: true
+      # The one workflow step that does not go through a mise task: this job
+      # deliberately has no checkout (it only needs the two artifacts), so there
+      # is no mise.toml here to run a task from.
       - name: Diff
         run: |
           set -euo pipefail

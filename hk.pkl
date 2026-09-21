@@ -1,0 +1,62 @@
+/// Git hooks for Focale.
+///
+/// Every command lives in `mise.toml` — this file only decides when each task
+/// runs and against which files. Install the hooks with `mise run hooks`.
+///
+/// Keep the version below in sync with `hk` in `mise.toml`.
+amends "package://github.com/jdx/hk/releases/download/v2.0.1/hk@2.0.1#/Config.pkl"
+
+min_hk_version = "2.0.1"
+default_branch = "master"
+
+hooks {
+  ["pre-commit"] {
+    fix = true
+    // Run against the staged content, not the dirty worktree: hk saves unstaged
+    // work, formats, stages only the files it selected, then restores the rest.
+    stash = "git"
+    steps {
+      ["fmt"] {
+        glob = "**/*.rs"
+        fix = "mise run fmt"
+      }
+    }
+  }
+
+  ["commit-msg"] {
+    steps {
+      // convco rather than hk's check_conventional_commit builtin: hk can only
+      // validate a single message, and pre-push and CI need a *range* checker,
+      // so convco is the one implementation of the rule. Merge and rebase
+      // commits are exempt; the task handles that.
+      ["conventional-commit"] {
+        check = "mise run commit-msg '{{commit_msg_file}}'"
+      }
+    }
+  }
+
+  ["pre-push"] {
+    steps {
+      // All three are deliberately unglobbed. Each runs a workspace-wide cargo
+      // command that ignores hk's file selection, so a glob would only gate
+      // whether the step runs at all — and a push touching just Cargo.toml,
+      // rust-toolchain.toml or rustfmt.toml would then skip a gate CI still
+      // enforces. Matches the lefthook config this replaces.
+      ["fmt-check"] {
+        check = "mise run fmt-check"
+      }
+      ["lint"] {
+        check = "mise run lint"
+      }
+      ["test"] {
+        check = "mise run test"
+      }
+      ["validate-hooks"] {
+        check = "mise run validate-hooks"
+      }
+      ["commits"] {
+        check = "mise run commits"
+      }
+    }
+  }
+}

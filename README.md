@@ -78,7 +78,7 @@ A: If you have another tool you need to further process your images, your best b
 ### Getting Started
 
 ```bash
-just run                     # launch the desktop app (Wayland/X11)
+mise run run                 # launch the desktop app (Wayland/X11)
 scripts/fetch-models.sh      # optional: download the AI segmentation models
 cargo run -p focale-cli -- render photo.ARW --format tiff16   # headless export
 ```
@@ -94,33 +94,62 @@ bit-identically on any machine, forever. See the docs index at `docs/README.md`
 ### Prerequisites
 
 - [Rust (rustup)](https://rustup.rs) — toolchain (pinned via `rust-toolchain.toml`)
-- [just](https://github.com/casey/just) — command runner
-- [Lefthook](https://github.com/evilmartians/lefthook) — git hooks manager (`lefthook install` after cloning)
-- [convco](https://github.com/convco/convco) — conventional-commit checker used by hooks
-- cmake + a C++ toolchain — builds the vendored libjxl for JPEG XL export
+- [mise](https://mise.jdx.dev) — task runner; it also pins and installs `hk` and `convco`
+- cmake + a C++ toolchain — builds the vendored libjxl for JPEG XL export (not managed by mise)
+
+After cloning:
+
+```bash
+mise install      # fetch the pinned tools (hk, convco)
+mise run hooks    # install the git hooks
+```
+
+`mise.toml` pins [hk](https://hk.jdx.dev) (git hooks) and
+[convco](https://github.com/convco/convco) (conventional-commit checker), so neither
+needs installing by hand. `mise run hooks` installs the hooks into this clone only,
+and they run through `mise x` — so whatever launches git must have `mise` on its
+`PATH`. Committing from a GUI client with a trimmed environment needs mise's shim
+directory added to that client's `PATH`.
 
 ## Commands
 
-| Command      | Description                                  |
-| ------------ | -------------------------------------------- |
-| `just check` | Run everything CI runs (format, lint, tests) |
-| `just test`  | Run the test suite                           |
-| `just fmt`   | Format code                                  |
-| `just lint`  | Clippy with warnings denied                  |
-| `just run`   | Launch the desktop app                       |
+`mise.toml` is the single source of truth for every command: the git hooks and
+every CI job invoke these same tasks. `mise tasks ls` lists them all.
+
+| Command               | Description                                  |
+| --------------------- | -------------------------------------------- |
+| `mise run check`      | Run every gate CI runs (format, lint, tests, hk.pkl) |
+| `mise run test`       | Run the test suite                           |
+| `mise run fmt`        | Format code                                  |
+| `mise run lint`       | Clippy with warnings denied                  |
+| `mise run run`        | Launch the desktop app                       |
+| `mise run commits`    | Validate conventional commits in a range     |
+| `mise run determinism`| Render the determinism fixture and hash it   |
 
 ## Git Hooks
 
-This project uses Lefthook. Pre-commit auto-formats staged Rust files; commit-msg
-validates the message is a conventional commit; pre-push runs the full CI check suite
-(format, clippy, tests, commit-range check) so pushes never fail CI.
+This project uses [hk](https://hk.jdx.dev); `mise run hooks` installs them.
+`hk.pkl` decides only *when* each task runs — the commands themselves come from
+`mise.toml`.
+
+- **pre-commit** formats staged Rust files. hk stashes unstaged work first, so the
+  hook sees the staged content and only the files you staged get formatted and
+  re-staged — work you deliberately left out of the commit is preserved untouched.
+- **commit-msg** validates the message is a conventional commit; merge and rebase
+  commits are exempt.
+- **pre-push** runs the full CI check suite (format, clippy, tests, commit-range
+  check, hk.pkl validation) on every push, so pushes should not fail CI. The
+  Determinism workflow is the one exception — it is a two-architecture comparison
+  CI alone can make.
 
 ## CI/CD
 
-GitHub Actions runs format checks, clippy, tests on pushes to `master` and pull
-requests, plus conventional-commit validation on pull requests. A separate
-Determinism workflow renders the committed (raw + sidecar) fixture on x86_64 and
-aarch64 in every export format and fails if any byte differs (`docs/verification.md`).
+GitHub Actions runs format checks, clippy, tests and an `hk.pkl` validation on pushes
+to `master` and pull requests, plus conventional-commit validation on pull requests.
+Every job invokes the same `mise run <task>` a developer runs locally, so CI and the
+git hooks cannot drift apart. A separate Determinism workflow renders the committed
+(raw + sidecar) fixture on x86_64 and aarch64 in every export format and fails if any
+byte differs (`docs/verification.md`).
 
 ## Releases & Changelog
 

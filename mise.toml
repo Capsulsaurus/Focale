@@ -1,0 +1,72 @@
+# Single source of truth for Focale's commands.
+#
+# The git hooks (hk.pkl) and every GitHub Actions job invoke these tasks; no
+# command string is defined anywhere else. Run `mise tasks ls` to list them.
+
+[tools]
+# Keep the version in sync with the `amends` URL at the top of hk.pkl.
+hk = "2.0.1"
+cargo-binstall = "1.23.0"
+"cargo:convco" = "0.7.2"
+
+[tasks.fmt]
+description = "Format all Rust sources"
+run = "cargo fmt"
+
+[tasks.fmt-check]
+description = "Verify formatting"
+run = "cargo fmt --check"
+
+[tasks.lint]
+description = "Clippy over the workspace, warnings denied"
+run = "cargo clippy --workspace --all-targets -- -D warnings"
+
+[tasks.test]
+description = "Workspace test suite"
+run = "cargo test --workspace"
+
+[tasks.build]
+description = "Build the workspace"
+run = "cargo build --workspace"
+
+[tasks.run]
+description = "Launch the desktop app (Wayland/X11)"
+run = "cargo run -p focale-app --"
+
+[tasks.check]
+description = "Everything CI runs"
+run = [
+  "mise run fmt-check",
+  "mise run lint",
+  "mise run test",
+  "mise run validate-hooks",
+]
+
+[tasks.commits]
+description = "Validate conventional commits over a range"
+usage = 'arg "[range]" help="Commit range to check" default="origin/master..HEAD"'
+run = 'convco check "$usage_range"'
+
+[tasks.commit-msg]
+description = "Validate a single commit message file"
+usage = 'arg "<file>" help="Path to the commit message file"'
+run = '''
+# Merge and rebase commits are exempt (AGENTS.md); git is mid-operation then.
+if git rev-parse -q --verify MERGE_HEAD >/dev/null 2>&1; then exit 0; fi
+if [ -d "$(git rev-parse --git-path rebase-merge)" ] \
+  || [ -d "$(git rev-parse --git-path rebase-apply)" ]; then exit 0; fi
+convco check --from-stdin < "$usage_file"
+'''
+
+[tasks.determinism]
+description = "Render the determinism fixture in every export format and hash it"
+quiet = true
+run = "./scripts/determinism-hashes.sh"
+
+[tasks.validate-hooks]
+description = "Check hk.pkl parses (it does not resolve task names)"
+run = "hk validate"
+
+[tasks.hooks]
+description = "Install the hk git hooks in this clone"
+run = "hk install --mise"

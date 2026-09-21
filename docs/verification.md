@@ -26,6 +26,9 @@ check; write them before adding the next dependency, not after.
 - CI job matrix: `ubuntu-24.04` (x86_64) and `ubuntu-24.04-arm` (aarch64) render
   the committed fixture set and compare SHA-256 of output bytes; any divergence
   fails.
+- The render/hash step is `scripts/determinism-hashes.sh`, driven by the
+  `mise run determinism` task, so CI runs exactly what a developer can run
+  locally on one architecture.
 - Golden-file suites: (a) sidecar bytes for a canonical edit state, (b) frozen
   sidecars + frozen output hashes per pipeline version (regression), (c) colour
   transform vectors per gamut/format.
