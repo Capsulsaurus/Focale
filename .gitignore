@@ -3,6 +3,13 @@
 **/*.rs.bk
 *.pdb
 
+# === Tooling ===
+# mise's local, uncommitted config override.
+mise.local.toml
+.mise.local.toml
+# Default output of `mise run determinism`.
+/hashes*.txt
+
 # === Linux ===
 *~
 .fuse_hidden*
