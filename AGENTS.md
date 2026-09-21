@@ -26,13 +26,17 @@ changing processing code.
 
 ## Quality
 
-Validate changes with `just check` (exactly what CI runs), or individually:
+Validate changes with `mise run check` (exactly what CI runs), or individually:
 
 ```bash
-cargo test --workspace                                  # correctness
-cargo fmt --check                                       # formatting
-cargo clippy --workspace --all-targets -- -D warnings   # lint
+mise run test        # correctness  (cargo test --workspace)
+mise run fmt-check   # formatting   (cargo fmt --check)
+mise run lint        # lint         (cargo clippy --workspace --all-targets -- -D warnings)
 ```
+
+`mise.toml` is the single source of truth for these commands: the git hooks
+(`hk.pkl`) and every GitHub Actions job invoke the same tasks. Never inline a
+command in a hook or a workflow — add or change the task instead.
 
 - All `pub` items need doc comments where non-obvious; processing code documents its
   algorithm source (paper/reference implementation).
@@ -42,8 +46,9 @@ cargo clippy --workspace --all-targets -- -D warnings   # lint
 ## Commits
 
 Commits MUST follow [Conventional Commits](https://www.conventionalcommits.org/)
-(`feat:`, `fix:`, `chore:`, …) — enforced by `convco` at commit-msg, pre-push, and in
-CI on pull requests. Merge commits are exempt.
+(`feat:`, `fix:`, `chore:`, …) — enforced by `convco` (via `mise run commit-msg` and
+`mise run commits`) at commit-msg, pre-push, and in CI on pull requests. Merge commits
+are exempt.
 
 ## Releases
 
