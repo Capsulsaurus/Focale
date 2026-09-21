@@ -218,7 +218,7 @@ impl ViewportRenderer {
         let img = self.image.as_mut().expect("just created");
         if img.version != version {
             let mut halves: Vec<u16> = Vec::with_capacity(width as usize * height as usize * 4);
-            for px in rgb_f32.chunks_exact(3) {
+            for px in rgb_f32.as_chunks::<3>().0.iter() {
                 halves.push(half::f16::from_f32(px[0]).to_bits());
                 halves.push(half::f16::from_f32(px[1]).to_bits());
                 halves.push(half::f16::from_f32(px[2]).to_bits());

@@ -128,7 +128,7 @@ fn ycbcr_planes(signal: &SignalImage, bit_depth: u8, kr_kb: (f32, f32)) -> [Vec<
         Vec::with_capacity(n),
         Vec::with_capacity(n),
     ];
-    for px in signal.samples.chunks_exact(3) {
+    for px in signal.samples.as_chunks::<3>().0.iter() {
         let (r, g, b) = (px[0], px[1], px[2]);
         let y = kr * r + kg * g + kb * b;
         let cb = (b - y) / (2.0 * (1.0 - kb));

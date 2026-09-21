@@ -8,6 +8,20 @@
 //! order, `rayon` only over disjoint rows, all whole-image statistics
 //! computed sequentially, no `HashMap` iteration on the pixel path.
 
+// Frozen code is not restyled. `clippy::chunks_exact_to_as_chunks` (new in
+// Rust 1.98) fires on the `chunks_exact(3)` pixel walks throughout this tree
+// and would have us rewrite them as `as_chunks::<3>()`. That is a readability
+// preference, and this module may not be edited for preference: under
+// HARD-VER every algorithm here is pinned, so a mechanical rewrite buys a
+// tidier lint report in exchange for a diff across the frozen pixel loops
+// that the golden hashes then have to re-prove. Newer pipeline versions are
+// free to adopt the newer idiom.
+//
+// `unknown_lints` is allowed alongside it because the toolchain floats
+// (`rust-toolchain.toml` tracks `stable`): the lint does not exist before
+// 1.98, and naming an unknown lint is itself a warning on older compilers.
+#![allow(unknown_lints, clippy::chunks_exact_to_as_chunks)]
+
 pub mod color_grade;
 pub mod detail;
 pub mod finishing;
