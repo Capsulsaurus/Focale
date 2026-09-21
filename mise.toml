@@ -9,7 +9,7 @@ hk = "2.0.1"
 # convco publishes no x86_64-apple-darwin binary, so it goes through the cargo
 # backend: binstall grabs the prebuilt release where one exists (Linux, Apple
 # Silicon, Windows) and falls back to a source build rather than hard-failing.
-cargo-binstall = "latest"
+cargo-binstall = "1.23.0"
 "cargo:convco" = "0.7.2"
 
 [tasks.fmt]
@@ -41,7 +41,12 @@ description = "Everything CI runs"
 # Sequential, like the justfile recipe this replaces: the three gates contend on
 # cargo's target lock, so running them together buys nothing and interleaves the
 # output. CI still runs them as independent parallel jobs.
-run = ["mise run fmt-check", "mise run lint", "mise run test"]
+run = [
+  "mise run fmt-check",
+  "mise run lint",
+  "mise run test",
+  "mise run validate-hooks",
+]
 
 [tasks.commits]
 description = "Validate conventional commits over a range"
@@ -65,7 +70,7 @@ quiet = true
 run = "./scripts/determinism-hashes.sh"
 
 [tasks.validate-hooks]
-description = "Check hk.pkl parses and its steps resolve"
+description = "Check hk.pkl parses (it does not resolve task names)"
 run = "hk validate"
 
 [tasks.hooks]

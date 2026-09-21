@@ -18,12 +18,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: jdx/mise-action@v4
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt
+      - uses: jdx/mise-action@v4
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
       - run: mise run fmt-check
 
   clippy:
@@ -31,12 +31,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: jdx/mise-action@v4
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
+      - uses: jdx/mise-action@v4
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
       - uses: Swatinem/rust-cache@v2
       - run: mise run lint
 
@@ -45,12 +45,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: jdx/mise-action@v4
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - run: mise run test
+      - uses: jdx/mise-action@v4
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
 
   tooling:
     name: Tooling config

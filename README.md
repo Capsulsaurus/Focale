@@ -94,8 +94,8 @@ bit-identically on any machine, forever. See the docs index at `docs/README.md`
 ### Prerequisites
 
 - [Rust (rustup)](https://rustup.rs) — toolchain (pinned via `rust-toolchain.toml`)
-- [mise](https://mise.jdx.dev) — task runner; it also pins and installs the tools below
-- cmake + a C++ toolchain — builds the vendored libjxl for JPEG XL export (install separately)
+- [mise](https://mise.jdx.dev) — task runner; it also pins and installs `hk` and `convco`
+- cmake + a C++ toolchain — builds the vendored libjxl for JPEG XL export (not managed by mise)
 
 After cloning:
 
@@ -106,10 +106,10 @@ mise run hooks    # install the git hooks
 
 `mise.toml` pins [hk](https://hk.jdx.dev) (git hooks) and
 [convco](https://github.com/convco/convco) (conventional-commit checker), so neither
-needs installing by hand. `mise run hooks` installs the hooks into this clone only;
-it runs them through `mise x`, so git must be able to find `mise` on its `PATH` —
-if you commit from a GUI client with a trimmed environment, use
-`hk install --global --mise` instead.
+needs installing by hand. `mise run hooks` installs the hooks into this clone only,
+and they run through `mise x` — so whatever launches git must have `mise` on its
+`PATH`. Committing from a GUI client with a trimmed environment needs mise's shim
+directory added to that client's `PATH`.
 
 ## Commands
 
@@ -118,7 +118,7 @@ every CI job invoke these same tasks. `mise tasks ls` lists them all.
 
 | Command               | Description                                  |
 | --------------------- | -------------------------------------------- |
-| `mise run check`      | Run everything CI runs (format, lint, tests) |
+| `mise run check`      | Run every gate CI runs (format, lint, tests, hk.pkl) |
 | `mise run test`       | Run the test suite                           |
 | `mise run fmt`        | Format code                                  |
 | `mise run lint`       | Clippy with warnings denied                  |
@@ -138,8 +138,9 @@ This project uses [hk](https://hk.jdx.dev); `mise run hooks` installs them.
 - **commit-msg** validates the message is a conventional commit; merge and rebase
   commits are exempt.
 - **pre-push** runs the full CI check suite (format, clippy, tests, commit-range
-  check) on every push, so pushes should not fail CI. The Determinism workflow is
-  the exception — it is a two-architecture comparison CI alone can make.
+  check, hk.pkl validation) on every push, so pushes should not fail CI. The
+  Determinism workflow is the one exception — it is a two-architecture comparison
+  CI alone can make.
 
 ## CI/CD
 

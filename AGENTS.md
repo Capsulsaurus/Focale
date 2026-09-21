@@ -26,12 +26,15 @@ changing processing code.
 
 ## Quality
 
-Validate changes with `mise run check` (exactly what CI runs), or individually:
+Validate changes with `mise run check` — the four gate jobs CI runs on every push.
+CI additionally validates the commit range on pull requests (`mise run commits`) and
+runs the two-architecture Determinism workflow. Individually:
 
 ```bash
 mise run test        # correctness  (cargo test --workspace)
 mise run fmt-check   # formatting   (cargo fmt --check)
 mise run lint        # lint         (cargo clippy --workspace --all-targets -- -D warnings)
+mise run validate-hooks   # hk.pkl parses (hk validate)
 ```
 
 `mise.toml` is the single source of truth for these commands: the git hooks

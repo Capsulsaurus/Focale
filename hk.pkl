@@ -51,6 +51,9 @@ hooks {
       ["test"] {
         check = "mise run test"
       }
+      ["validate-hooks"] {
+        check = "mise run validate-hooks"
+      }
       ["commits"] {
         check = "mise run commits"
       }
